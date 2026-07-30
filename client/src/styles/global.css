@@ -1,0 +1,166 @@
+/* ── Global Reset ─────────────────────────────────────────────── */
+* { padding: 0; margin: 0; box-sizing: border-box; }
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #fff;
+}
+
+/* ── Navbar ───────────────────────────────────────────────────── */
+.wrapper-navbar {
+  background: linear-gradient(135deg, #4e32df, #e04857);
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  padding: 10px 0;
+}
+.wrapper-heading { width: 28%; text-align: center; }
+.wrapper-navbar label { text-align: center; color: #FFD700; font-weight: 500; }
+label.heading { font-size: 50px; width: 70%; color: #fff; display: block; }
+.wrapper-navbar img { width: 70px; }
+
+/* ── Dropdown Menu ────────────────────────────────────────────── */
+.menu, .menu ul, .menu li, .menu a {
+  margin: 0; padding: 0; border: none; outline: none;
+}
+.menu {
+  height: 40px;
+  background: linear-gradient(to bottom, #4c4e5a 0%, #2c2d33 100%);
+  border-radius: 5px;
+  display: flex;
+  justify-content: space-around;
+  padding: 0 100px;
+  list-style: none;
+}
+.menu li { position: relative; list-style: none; float: left; display: block; height: 40px; }
+.menu li a {
+  display: block; padding: 0 14px; margin: 6px 0;
+  line-height: 28px; text-decoration: none;
+  border-left: 1px solid #393942; border-right: 1px solid #4f5058;
+  font-family: Helvetica, Arial, sans-serif; font-weight: bold; font-size: 13px;
+  color: #f3f3f3; text-shadow: 1px 1px 1px rgba(0,0,0,.6);
+  transition: color .2s ease-in-out;
+}
+.menu li:first-child a { border-left: none; }
+.menu li:last-child a { border-right: none; }
+.menu li:hover > a { color: #8fde62; z-index: 2; }
+
+/* Dropdown sub-menu */
+.menu ul {
+  position: absolute; top: 40px; left: 0;
+  opacity: 0; background: #1f2024;
+  border-radius: 0 0 5px 5px;
+  transition: opacity .25s ease .1s;
+  z-index: -1;
+  list-style: none;
+  min-width: 140px;
+}
+.menu li:hover > ul { opacity: 1; z-index: 100; }
+.menu ul li { height: 0; overflow: hidden; padding: 0; transition: height .25s ease .1s; }
+.menu li:hover > ul li { height: 36px; overflow: visible; padding: 0; z-index: 2; }
+.menu ul li a {
+  width: 100%; padding: 4px 0 4px 14px; margin: 0;
+  border: none; border-bottom: 1px solid #353539; white-space: nowrap;
+}
+.menu ul li:last-child a { border: none; }
+
+/* ── Loading Overlay ──────────────────────────────────────────── */
+.opacity-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: #000; opacity: 0.5; z-index: 1000;
+  display: flex; align-items: center; justify-content: center;
+}
+.overlay-text { color: #fff; font-size: 20px; margin-top: 16px; }
+.spinner {
+  width: 50px; height: 50px;
+  border: 5px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Upload Page ──────────────────────────────────────────────── */
+.home-container {
+  width: 400px; margin: 40px auto;
+  background-color: #ffffffb3;
+  border-radius: 10px;
+  box-shadow: 10px 10px 5px #aaaaaa;
+  padding-bottom: 20px;
+}
+.home-container h1 { text-align: center; color: #3498db; padding: 16px 0 8px; }
+.input-container {
+  display: flex; flex-direction: column;
+  margin: 10px 40px; justify-content: center;
+}
+.input-container label {
+  padding-top: 10px; color: #3498db;
+  text-align: center; padding-bottom: 10px; font-weight: 500;
+}
+.input-container input { padding-top: 10px; color: #3498db; cursor: pointer; }
+.btn-container { margin: 10px 40px; display: flex; justify-content: space-around; }
+.btn-container button {
+  background-color: #3498db; border: none; color: #fff;
+  padding: 7px 15px; font-weight: 500; cursor: pointer;
+  border-radius: 5px; font-size: 15px; margin: 20px 0;
+  transition: background-color 0.2s;
+}
+.btn-container button:hover { background-color: #055c97; }
+
+/* ── Dashboard / Table Pages ──────────────────────────────────── */
+table {
+  width: 750px; border-collapse: collapse; margin: 50px auto;
+}
+tr:nth-of-type(odd) { background: #eee; }
+th { background: #3498db; color: white; font-weight: bold; }
+td, th { padding: 10px; border: 1px solid #ccc; text-align: left; font-size: 18px; }
+td a { color: #3498db; text-decoration: none; }
+td a:hover { text-decoration: underline; }
+
+.search-btn-container {
+  position: relative; width: 750px; top: 40px;
+  margin: auto; display: flex; flex-direction: row-reverse;
+}
+.search-btn-container button {
+  background-color: #3498db; border: none; color: #fff;
+  padding: 7px 15px; font-weight: 500; cursor: pointer;
+  border-radius: 5px; font-size: 20px; transition: background-color 0.2s;
+}
+.search-btn-container button:hover { background-color: #065183; }
+
+/* Search modal overlay */
+.search-modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.4); z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+}
+.search-form {
+  background: white; width: 420px; border-radius: 10px; padding: 20px;
+  box-shadow: 0 4px 8px rgba(0,0,0,.2), 0 6px 20px rgba(0,0,0,.19);
+}
+.search-form h2 { color: #3498db; text-align: center; margin-bottom: 16px; }
+.inputs { display: flex; justify-content: left; margin: 10px; align-items: center; }
+.inputs label { width: 40%; }
+.inputs input[type="date"] {
+  width: 55%; border: 2px solid black; padding: 5px; margin-left: 10px;
+}
+.search-form .btn-container {
+  width: 80%; margin: 16px auto 0; display: flex; justify-content: space-around;
+}
+.search-form .btn-container button:last-child { background-color: #f00909; }
+.search-form .btn-container button:last-child:hover { background-color: #800303; }
+
+/* Print button */
+.print-page {
+  margin: 10px auto 0; width: 740px;
+  display: flex; justify-content: flex-end;
+  cursor: pointer; position: relative; top: 50px;
+}
+.print-page img { width: 40px; }
+
+/* table-wrapper for scrollable tables */
+.table-wrapper { overflow-x: auto; }
