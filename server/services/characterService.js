@@ -30,42 +30,14 @@ class CharacterService {
 
   async getDashboard() {
     const psSource = await getPsSource();
-    const query = `
-      SELECT ps.CUG, ps.थाना, c_total, c_station, c_liu, c_dcrb, c_dcp, c_remain, mn, mx
-      FROM ${psSource}
-      LEFT JOIN (
-        SELECT थाना, COUNT(थाना) c_total, MIN(अनुरोध_दिनांक) mn, MAX(अनुरोध_दिनांक) mx
-        FROM characters GROUP BY थाना
-      ) t ON t.थाना = ps.थाना
-      LEFT JOIN (
-        SELECT COUNT(थाना) c_station, थाना FROM characters
-        WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(PS_STATUSES)})
-        GROUP BY थाना
-      ) s ON s.थाना = ps.थाना
-      LEFT JOIN (
-        SELECT COUNT(थाना) c_liu, थाना FROM characters
-        WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(LIU_STATUSES)})
-        GROUP BY थाना
-      ) liu ON liu.थाना = ps.थाना
-      LEFT JOIN (
-        SELECT COUNT(थाना) c_dcrb, थाना FROM characters
-        WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(DCRB_STATUSES)})
-        GROUP BY थाना
-      ) dcrb ON dcrb.थाना = ps.थाना
-      LEFT JOIN (
-        SELECT COUNT(थाना) c_dcp, थाना FROM characters
-        WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(DCP_STATUSES)})
-        GROUP BY थाना
-      ) dcp ON dcp.थाना = ps.थाना
-      LEFT JOIN (
-        SELECT COUNT(थाना) c_remain, थाना FROM characters
-        WHERE अनुरोध_की_स्थिति NOT IN ('स्वीकृत','अस्वीकृत')
-        GROUP BY थाना
-      ) rmain ON rmain.थाना = ps.थाना
-      ORDER BY ps.थाना
-    `;
-    const params = [...PS_STATUSES, ...LIU_STATUSES, ...DCRB_STATUSES, ...DCP_STATUSES];
-    const [rows] = await pool.execute(query, params);
+    const query = `SELECT
+                    station_name,
+                    station_code,
+                    COUNT(*) AS request_count
+                    FROM characters
+                    GROUP BY station_name, station_code
+                    ORDER BY station_name`;
+    const [rows] = await pool.execute(query);
     return rows;
   }
 

@@ -35,4 +35,53 @@ function parseAddress(fullAddress = '', district = '') {
   };
 }
 
-module.exports = { parseAddress };
+
+function findAddressDetails(address, districtMap) {
+
+    for (const [districtHindiName, districtData] of districtMap) {
+
+        if (!address.includes(districtHindiName)) continue;
+
+        const result = {
+            district_name: districtData.district_name,              // English
+            district_hindi_name: districtData.district_hindi_name,  // Hindi
+            district_code: districtData.district_code,
+            station_name: null,            // English
+            station_hindi_name: null,      // Hindi
+            station_code: null,
+            address: address
+        };
+
+        for (const [stationHindiName, stationData] of districtData.stations) {
+
+            if (address.includes(stationHindiName)) {
+
+                result.station_name = stationData.station_name;               // English
+                result.station_hindi_name = stationData.station_hindi_name;   // Hindi
+                result.station_code = stationData.station_code;
+
+                result.address = address
+                    .replace(stationHindiName, "")
+                    .replace(districtHindiName, "")
+                    .replace(/उत्तर\s*प्रदेश/gi, "")
+                    .replace(/\s+/g, " ")
+                    .trim();
+
+                break;
+            }
+        }
+
+        return result;
+    }
+
+    return {
+        district_name: null,
+        district_hindi_name: null,
+        district_code: null,
+        station_name: null,
+        station_hindi_name: null,
+        station_code: null,
+        address
+    };
+}
+module.exports = { parseAddress, findAddressDetails };
