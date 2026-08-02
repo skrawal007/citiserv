@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import Navbar from '../components/Navbar';
-import { getPendingChars } from '../api';
 
 const LOC_HEADINGS = {
   totaldcp:     'कुल डीसीपी पर लम्बित चरित्र प्रमाण पत्र',
@@ -41,9 +41,9 @@ export default function Characters() {
     setLoading(true);
     setError('');
     setRows([]);
-    getPendingChars(loc)
-      .then(data => setRows(data))
-      .catch(e => setError(e.message))
+    axios.get('/pending', { params: { loc } })
+      .then(res => setRows(res.data || []))
+      .catch(e => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
   }, [loc]);
 

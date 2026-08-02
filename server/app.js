@@ -27,10 +27,14 @@ if (config.NODE_ENV !== 'test') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// API Routes
+// Direct Routes & API Routes
+app.use('/', characterRoutes);
 app.use('/api/characters', characterRoutes);
 
 // Health Check
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', message: 'CCTNS AGRA API running', timestamp: new Date().toISOString() });
+});
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'CCTNS AGRA API running', timestamp: new Date().toISOString() });
 });

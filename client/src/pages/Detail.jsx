@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import axios from 'axios';
 import Navbar from '../components/Navbar';
-import { getDetails } from '../api';
 
 const LOC_HEADINGS = {
   liu: 'एलआईयू पर लम्बित चरित्र प्रमाण पत्र',
@@ -46,9 +46,11 @@ export default function Detail() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    getDetails({ loc, ps, sdate, edate, cug })
-      .then(data => setRows(data))
-      .catch(e => setError(e.message))
+    axios.get('/details', {
+      params: { loc, ps, sdate, edate, cug }
+    })
+      .then(res => setRows(res.data || []))
+      .catch(e => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
   }, [loc, ps, sdate, edate, cug]);
 

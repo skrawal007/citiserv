@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import Navbar from '../components/Navbar';
-import { getDashboard, getDashboardByDate, getMinDate, getMaxDate } from '../api';
 
 // Format date from YYYY-MM-DD to DD-MM-YYYY (matching PHP display)
 function fmt(dateStr) {
@@ -18,7 +17,6 @@ export default function Dashboard() {
   const [edate, setEdate] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadDefault();
@@ -28,16 +26,13 @@ export default function Dashboard() {
     setLoading(true);
     setError('');
     try {
-      const [data, minD, maxD] = await Promise.all([
-        getDashboard(),
-        getMinDate(),
-        getMaxDate(),
-      ]);
-      setRows(data);
-      setMinDate(minD.minDate || '');
-      setMaxDate(maxD.maxDate || '');
+   
+
+      const res = await axios.get('/dashboard');
+      console.log('Dashboard data:', res.data);
+      setRows(res.data || []);
     } catch (e) {
-      setError(e.message);
+      setError(e.response?.data?.error || e.message);
     } finally {
       setLoading(false);
     }
@@ -49,12 +44,12 @@ export default function Dashboard() {
     setLoading(true);
     setShowSearch(false);
     try {
-      const data = await getDashboardByDate(sdate, edate);
-      setRows(data);
+      const res = await axios.post('/dashboard', { sdate, edate });
+      setRows(res.data || []);
       setMinDate(sdate);
       setMaxDate(edate);
     } catch (e) {
-      setError(e.message);
+      setError(e.response?.data?.error || e.message);
     } finally {
       setLoading(false);
     }
@@ -63,12 +58,12 @@ export default function Dashboard() {
   // Totals
   const totals = rows.reduce(
     (acc, r) => ({
-      total:   acc.total   + (r.c_total   || 0),
-      remain:  acc.remain  + (r.c_remain  || 0),
+      total: acc.total + (r.c_total || 0),
+      remain: acc.remain + (r.c_remain || 0),
       station: acc.station + (r.c_station || 0),
-      dcrb:    acc.dcrb    + (r.c_dcrb    || 0),
-      liu:     acc.liu     + (r.c_liu     || 0),
-      dcp:     acc.dcp     + (r.c_dcp     || 0),
+      dcrb: acc.dcrb + (r.c_dcrb || 0),
+      liu: acc.liu + (r.c_liu || 0),
+      dcp: acc.dcp + (r.c_dcp || 0),
     }),
     { total: 0, remain: 0, station: 0, dcrb: 0, liu: 0, dcp: 0 }
   );
@@ -141,13 +136,13 @@ export default function Dashboard() {
             {!loading && rows.map((r, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
-                <td>{r['थाना']}</td>
-                <td><a href={detailLink(r.CUG, 'all', r['थाना'])} target="_blank" rel="noreferrer">{r.c_total || 0}</a></td>
-                <td><a href={detailLink(r.CUG, 'remain', r['थाना'])} target="_blank" rel="noreferrer">{r.c_remain || 0}</a></td>
-                <td><a href={detailLink(r.CUG, 'ps', r['थाना'])} target="_blank" rel="noreferrer">{r.c_station || 0}</a></td>
-                <td><a href={detailLink(r.CUG, 'dcrb', r['थाना'])} target="_blank" rel="noreferrer">{r.c_dcrb || 0}</a></td>
-                <td><a href={detailLink(r.CUG, 'liu', r['थाना'])} target="_blank" rel="noreferrer">{r.c_liu || 0}</a></td>
-                <td><a href={detailLink(r.CUG, 'dcp', r['थाना'])} target="_blank" rel="noreferrer">{r.c_dcp || 0}</a></td>
+                <td>{r.station_name}</td> 
+                <td><a href={detailLink(r.CUG, 'all', r['थाना'])} target="_blank" rel="noreferrer">{r.request_count || 0}</a></td>
+                <td><a href={detailLink(r.CUG, 'remain', r['थाना'])} target="_blank" rel="noreferrer">{r.pending_count || 0}</a></td>
+                <td><a href={detailLink(r.CUG, 'ps', r['थाना'])} target="_blank" rel="noreferrer">{r.pending_ps_count || 0}</a></td>
+                <td><a href={detailLink(r.CUG, 'dcrb', r['थाना'])} target="_blank" rel="noreferrer">{r.pending_dcrb_count || 0}</a></td>
+                <td><a href={detailLink(r.CUG, 'liu', r['थाना'])} target="_blank" rel="noreferrer">{r.pending_liu_count || 0}</a></td>
+                <td><a href={detailLink(r.CUG, 'dcp', r['थाना'])} target="_blank" rel="noreferrer">{r.pending_dcp_count || 0}</a></td>
               </tr>
             ))}
           </tbody>

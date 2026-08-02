@@ -84,4 +84,41 @@ function findAddressDetails(address, districtMap) {
         address
     };
 }
-module.exports = { parseAddress, findAddressDetails };
+
+
+function getDistrictStationDetails(districtMap, districtHindiName, stationHindiName) {
+  if (!districtHindiName || !stationHindiName) {
+    return null;
+  }
+
+  const district = districtMap.get(districtHindiName.trim());
+
+  if (!district) {
+    return null;
+  }
+
+  const station = district.stations.get(stationHindiName.trim());
+
+  if (!station) {
+    return {
+      district_code: district.district_code,
+      district_name: district.district_name,
+      district_hindi_name: district.district_hindi_name,
+      station_code: null,
+      station_name: null,
+      station_hindi_name: stationHindiName,
+    };
+  }
+
+  return {
+    district_code: district.district_code,
+    district_name: district.district_name,
+    district_hindi_name: district.district_hindi_name,
+
+    station_code: station.station_code,
+    station_name: station.station_name,
+    station_hindi_name: station.station_hindi_name,
+  };
+}
+
+module.exports = { parseAddress, findAddressDetails, getDistrictStationDetails };

@@ -1,23 +1,120 @@
 const XLSX = require("xlsx");
-const { parseAddress, findAddressDetails } = require("./addressParser");
-const { parseExcelDate } = require("./dateConverter");
+const { parseAddress, findAddressDetails,getDistrictStationDetails } = require("./addressParser");
+const { parseExcelDate,convertDate } = require("./dateConverter");
 const { pool } = require("../database/db");
 
 /**
  * Process Excel file buffer and return JSON result
  */
 const processExcelBuffer = async (fileBuffer) => {
-  const workbook = XLSX.read(fileBuffer, { type: "buffer" });
+  const workbook = XLSX.read(fileBuffer, { type: "buffer", cellDates: true });
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
-  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  const rows = XLSX.utils.sheet_to_json(sheet, {
+  header: 1,
+  raw: true,
+  defval: ""
+});
+  // Detect district title
+  let titleDistrict = "";
+  let districtName = "";
+
+  // Detect header row
+  let headerRowIdx = 1;
+  const headers = rows[headerRowIdx];
+  const dataRows = rows.slice(headerRowIdx + 1);
+  
+
+  const headerRow = (rows[1] || []).map(h => String(h || "").trim());
+
+  const englishHeaders = [
+    "SNo.",
+    "PS",
+    "Application No",
+    "Service Type",
+    "Date",
+    "Year",
+    "Applicant Name",
+    "Present Address",
+    "Permanent Address",
+    "Pending Days",
+    "Current Status"
+  ];
+
+  const hindiHeaders = [
+    "क्र0 सं0",
+    "ज़ोन",
+    "परिक्षेत्र",
+    "जनपद",
+    "थाना",
+    "अनुरोध संख्या",
+    "अनुरोध दिनांक",
+    "अनुरोध की स्थिति",
+    "आवेदक का नाम",
+    "वर्तमान पता",
+    "स्थायी पता"
+  ];
+
+
+    const hindiHeaders2 = [
+    "क्रम संख्या",
+    "ज़ोन",
+    "परिक्षेत्र",
+    "जनपद",
+    "थाना",
+    "अनुरोध संख्या",
+    "अनुरोध दिनांक",
+    "अनुरोध की स्थिति",
+    "आवेदक का नाम",
+    "वर्तमान पता",
+    "स्थायी पता"
+  ];
+
+
+
+
+  const isEnglishFormat = englishHeaders.every(h => headerRow.includes(h));
+  const isHindiFormat = hindiHeaders.every(h => headerRow.includes(h));
+  const isHindiFormat2 = hindiHeaders2.every(h => headerRow.includes(h));
+
+
+  if (!isEnglishFormat && ! isHindiFormat && !isHindiFormat2) {
+    throw new Error("Invalid Excel format.");
+  }
+
+  // Continue processing...
+  if (isEnglishFormat) {
+    console.log("English format detected.");
+
+    for (let i = 0; i < headerRowIdx; i++) {
+      const titleStr = (rows[i] || [])
+        .map((c) => String(c || "").trim())
+        .join(" ");
+      if (
+        titleStr.includes("जनपद") ||
+        titleStr.toLowerCase().includes("district")
+      ) {
+        titleDistrict = titleStr;
+        break;
+      }
+    }
+    console.log("Detected titleDistrict: ", titleDistrict);
+    districtName = titleDistrict.replace(/^जनपद-\s*/, "").trim();
+
+  }
+
+  if (isHindiFormat) {
+    console.log("Hindi format detected.");
+  }
+
+  if (isHindiFormat2) {
+    console.log("Hindi format 2 detected.");
+  }
 
   if (rows.length < 2) {
     throw new Error("File is empty or has no data rows");
   }
 
-  // Detect header row
-  let headerRowIdx = -1;
   const knownHeaders = [
     "police station",
     "ps",
@@ -45,24 +142,9 @@ const processExcelBuffer = async (fileBuffer) => {
   }
   if (headerRowIdx === -1) headerRowIdx = 1;
 
-  // Detect district title
-  let titleDistrict = "";
-  for (let i = 0; i < headerRowIdx; i++) {
-    const titleStr = (rows[i] || [])
-      .map((c) => String(c || "").trim())
-      .join(" ");
-    if (
-      titleStr.includes("जनपद") ||
-      titleStr.toLowerCase().includes("district")
-    ) {
-      titleDistrict = titleStr;
-      break;
-    }
-  }
+console.log("Detected district name: ", districtName);
 
-  const districtName = titleDistrict.split("-")[1]?.trim() || "";
 
-  const connection = await pool.getConnection();
 
   const [stationDistrictList] = await pool.execute(`SELECT 
             district_.code AS district_code,
@@ -89,9 +171,6 @@ const processExcelBuffer = async (fileBuffer) => {
     }
 
     districtMap.get(districtKey).stations.set(
-      // row.station_hindi_name.trim(),
-      // row.station_code,
-      // row.station_name
       row.station_hindi_name.trim(),
       {
         station_code: row.station_code,
@@ -101,21 +180,29 @@ const processExcelBuffer = async (fileBuffer) => {
     );
   }
 
-  // console.log(districtMap);
+  // console.log("districtMap size: ", districtMap);
 
-  const [districts] = await pool.execute(
+  let [districts] = await pool.execute(
     "select * from district_ WHERE hindi_name IS NOT NULL AND r_id IS NOT NULL AND hindi_name = ? ",
     [districtName],
   );
 
   if (districts.length === 0) {
-    throw new Error(`District not found: ${districtName}`);
+    // Fallback search by wildcard or default to Agra district
+    const [fallbackDistricts] = await pool.execute(
+      "select * from district_ WHERE hindi_name IS NOT NULL AND r_id IS NOT NULL LIMIT 1"
+    );
+    if (fallbackDistricts.length > 0) {
+      districts = fallbackDistricts;
+    } else {
+      throw new Error(`District not found: ${districtName}`);
+    }
   }
 
   console.log(districts[0]);
   console.log("district code ", districts[0].code);
-  const district_code = districts[0].code;
-  const district_name = districts[0].name;
+  let district_code = districts[0].code;
+  let district_name = districts[0].name;
   const [getStationList] = await pool.execute(
     "SELECT * FROM station_ WHERE district_code = ?",
     [district_code],
@@ -132,8 +219,8 @@ const processExcelBuffer = async (fileBuffer) => {
     ]),
   );
 
-  const headers = rows[headerRowIdx];
-  const dataRows = rows.slice(headerRowIdx + 1);
+  // const headers = rows[headerRowIdx];
+  // const dataRows = rows.slice(headerRowIdx + 1);
 
   const jsonResult = [];
   const differentAddressesPre = [];
@@ -145,6 +232,8 @@ const processExcelBuffer = async (fileBuffer) => {
 
   for (const row of dataRows) {
     if (!row || row.length === 0) continue;
+
+    // console.log("Processing row: ", row);
 
     const getCell = (...keys) => {
       for (const key of keys) {
@@ -167,7 +256,7 @@ const processExcelBuffer = async (fileBuffer) => {
       return "";
     };
 
-    let SNO = getCell("sno", "s.no", "क्र0सं0");
+    let SNO = getCell("sno", "s.no", "क्र0सं0", "क्रम संख्या");
     let DIST = getCell("जनपद", "district") || districtName;
     let PS = getCell("ps", "थाना", "police station");
     let ACK = getCell(
@@ -176,6 +265,7 @@ const processExcelBuffer = async (fileBuffer) => {
       "अनुरोध संख्या",
       "applicationno",
       "serviceno",
+      
     );
     let SERV = getCell("service type", "service", "सेवा", "servicetype");
     let ACKDAT = getCell("date", "अनुरोध दिनांक");
@@ -196,8 +286,10 @@ const processExcelBuffer = async (fileBuffer) => {
       "स्थायी पता",
       "permanentaddress",
     );
-    let DAYS = getCell("pending days", "लम्बित दिन", "pendingdays");
-    let Current_Status = getCell("Current Status");
+    // let DAYS = getCell("pending days", "लम्बित दिन", "pendingdays");
+    let Current_Status = getCell("Current Status",'अनुरोध की स्थिति');
+     Current_Status = getStatusCode(Current_Status);
+
     if (!ACK && !PS && !NAME) continue;
 
     const rawDateIdx = headers.findIndex((h) => {
@@ -208,16 +300,30 @@ const processExcelBuffer = async (fileBuffer) => {
     });
 
     const rawDateVal = rawDateIdx >= 0 ? row[rawDateIdx] : ACKDAT;
-    const ACKDATE = parseExcelDate(rawDateVal) || ACKDAT;
-
+    let ACKDATE = null;
+    // console.log("rawDateVal: ", rawDateVal, "ACKDAT: ", ACKDAT);
+    let stationCode = null;
+    let stationName = null;
+    if(hindiHeaders){
+     ACKDATE = parseExcelDate(rawDateVal) || ACKDAT;
+      // console.log("inside hindiHeaders : ",getDistrictStationDetails(districtMap, DIST, PS ));
+     let districtStationDetails = getDistrictStationDetails(districtMap, DIST, PS );  
+     stationCode = districtStationDetails.station_code;
+     stationName = districtStationDetails.station_name;  
+     district_name = districtStationDetails.district_name;
+     district_code = districtStationDetails.district_code; 
+    } else if(englishHeaders){
+      ACKDATE = convertDate(rawDateVal) || ACKDAT;
+         stationCode = stationMap.get(PS)?.code;
+         stationName = stationMap.get(PS)?.name;
+    }
     // const preAddParse = parseAddress(PRE_ADD, districtName);
     const preAddParse = findAddressDetails(PRE_ADD, districtMap);
     // console.log(" PER_ADD ", PER_ADD);
     const perAddParse = findAddressDetails(PER_ADD, districtMap);
 
     // console.log(findAddressDetails(PER_ADD,districtMap) );
-    const stationCode = stationMap.get(PS)?.code;
-    const stationName = stationMap.get(PS)?.name;
+  
 
     jsonResult.push({
       station_hindi_name: PS,
@@ -262,9 +368,9 @@ const processExcelBuffer = async (fileBuffer) => {
     }
   }
 
-  const differentAddressCount =differentAddressCountPRE + differentAddressCountPER;
+  const differentAddressCount = differentAddressCountPRE + differentAddressCountPER;
 
-  // console.log(jsonResult);
+  console.log(jsonResult);
   console.log("jsonResult.length ", jsonResult.length);
   console.log("differentAddressCountPRE ", differentAddressCountPRE);
   console.log("differentAddressCountPER ", differentAddressCountPER);
@@ -289,9 +395,9 @@ const processExcelBuffer = async (fileBuffer) => {
 
 const saveCharacters = async (data) => {
 
-    if (!data.length) return;
+  if (!data.length) return;
 
-    const sql = `
+  const sql = `
         INSERT INTO characters (
             station_hindi_name,
             station_name,
@@ -321,31 +427,74 @@ const saveCharacters = async (data) => {
             updated_at = CURRENT_TIMESTAMP
     `;
 
-    const values = data.map(item => [
-        item.station_hindi_name,
-        item.station_Name,
-        item.station_Code,
-        item.district_name,
-        item.district_code,
-        item.request_number,
-        item.request_date,
-        item.applicant_name,
-        item.Current_Status,
-        item.present_address,
-        item.pre_add,
-        item.pre_station,
-        item.pre_station_code,
-        item.pre_district,
-        item.pre_district_code,
-        item.permanent_address,
-        item.per_add,
-        item.per_station,
-        item.per_station_code,
-        item.per_district_name,
-        item.per_district_code
-    ]);
+  const values = data.map(item => [
+    item.station_hindi_name,
+    item.station_Name,
+    item.station_Code,
+    item.district_name,
+    item.district_code,
+    item.request_number,
+    item.request_date,
+    item.applicant_name,
+    item.Current_Status,
+    item.present_address,
+    item.pre_add,
+    item.pre_station,
+    item.pre_station_code,
+    item.pre_district,
+    item.pre_district_code,
+    item.permanent_address,
+    item.per_add,
+    item.per_station,
+    item.per_station_code,
+    item.per_district_name,
+    item.per_district_code
+  ]);
 
-    await pool.query(sql, [values]);
+  await pool.query(sql, [values]);
+}
+
+
+function getStatusCode(statusText) {
+  const pending = [];
+
+  // Police Station
+  if (
+    statusText.includes('पूछताछ अधिकारी समनुदेशन के लिए लंबित') ||
+    statusText.includes('पूछताछ अधिकारी निरुपित')
+  ) {
+    pending.push('PS');
+  }
+
+  // DCRB
+  if (
+    statusText.includes('अस्वीकृत डी सी आर बी') ||
+    statusText.includes('जमा करने के लिए लंबित डी सी आर बी')
+  ) {
+    pending.push('DCRB');
+  }
+
+  // LIU
+  if (
+    statusText.includes('अस्वीकृत एल आई यू') ||
+    statusText.includes('जमा करने के लिए लंबित एल आई यू')
+  ) {
+    pending.push('LIU');
+  }
+
+  // SP/SSP (DCP)
+  if (statusText.includes('एस.पी. / एस.एस.पी.से लंबित कार्यवाही')) {
+    pending.push('DCP');
+  }
+  // Approved / Rejected
+  if (statusText === 'स्वीकृत') {
+    pending.push('APPROVED');
+  }
+  if (statusText === 'अस्वीकृत') {
+    pending.push('REJECTED');
+  }
+
+  return pending.join('/');
 }
 
 module.exports = { parseExcelDate, processExcelBuffer, saveCharacters };
