@@ -3,18 +3,27 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 
+const MODULE_NAMES = {
+  character: 'चरित्र प्रमाण पत्र',
+  tenant: 'किरायेदार सत्यापन',
+  domestic: 'घरेलू सहायक सत्यापन',
+  employee: 'कर्मचारी सत्यापन',
+  complaints: 'शिकायत निवारण',
+  all: 'सत्यापन',
+};
+
 const LOC_HEADINGS = {
-  liu: 'एलआईयू पर लम्बित चरित्र प्रमाण पत्र',
-  ps: 'थाने पर लम्बित चरित्र प्रमाण पत्र',
-  dcrb: 'डीसीआरबी पर लम्बित चरित्र प्रमाण पत्र',
-  dcp: 'डीसीपी पर लम्बित चरित्र प्रमाण पत्र',
-  remain: 'कुल लम्बित चरित्र प्रमाण पत्र',
-  all: 'कुल चरित्र प्रमाण पत्र',
-  totaldcp: 'कुल डीसीपी पर लम्बित चरित्र प्रमाण पत्र',
-  totalliu: 'कुल एलआईयू पर लम्बित चरित्र प्रमाण पत्र',
-  totaldcrb: 'कुल डीसीआरबी पर लम्बित चरित्र प्रमाण पत्र',
-  totalps: 'कुल थानों पर लम्बित चरित्र प्रमाण पत्र',
-  totalremain: 'समस्त पश्चिमी जोन पर लम्बित चरित्र प्रमाण पत्र',
+  liu: 'एलआईयू पर लम्बित',
+  ps: 'थाने पर लम्बित',
+  dcrb: 'डीसीआरबी पर लम्बित',
+  dcp: 'डीसीपी पर लम्बित',
+  remain: 'कुल लम्बित',
+  all: 'कुल',
+  totaldcp: 'कुल डीसीपी पर लम्बित',
+  totalliu: 'कुल एलआईयू पर लम्बित',
+  totaldcrb: 'कुल डीसीआरबी पर लम्बित',
+  totalps: 'कुल थानों पर लम्बित',
+  totalremain: 'समस्त पश्चिमी जोन पर लम्बित',
 };
 
 const STATUS_MAP = {
@@ -37,6 +46,7 @@ export default function Detail() {
   const sdate = searchParams.get('sdate') || '';
   const edate = searchParams.get('edate') || '';
   const cug = searchParams.get('CUG') || searchParams.get('cug') || '';
+  const type = searchParams.get('type') || 'character';
 
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +57,19 @@ export default function Detail() {
     setLoading(true);
     setError('');
     axios.get('/details', {
-      params: { loc, ps, sdate, edate, cug }
+      params: { loc, ps, sdate, edate, cug, type }
     })
       .then(res => setRows(res.data || []))
       .catch(e => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
-  }, [loc, ps, sdate, edate, cug]);
+  }, [loc, ps, sdate, edate, cug, type]);
 
   const hideStatus = ['liu', 'ps', 'dcrb', 'dcp', 'totaldcp', 'totalliu', 'totaldcrb', 'totalps'].includes(loc);
   const hidePs = ['liu', 'ps', 'dcrb', 'dcp', 'remain', 'all'].includes(loc);
-  const heading = LOC_HEADINGS[loc] || '';
+  
+  const moduleName = MODULE_NAMES[type] || MODULE_NAMES.character;
+  const locHeading = LOC_HEADINGS[loc] || '';
+  const heading = `${locHeading} ${moduleName}`.trim();
 
   return (
     <>
@@ -66,7 +79,7 @@ export default function Detail() {
         <table id="printable" ref={tableRef}>
           <thead>
             {heading && (
-              <tr><th colSpan="8" style={{ textAlign: 'center' }}>{heading}</th></tr>
+              <tr><th colSpan="8" style={{ textAlign: 'center', fontSize: '18px' }}>{heading}</th></tr>
             )}
             <tr>
               {!hidePs && <th>थाना</th>}
@@ -96,12 +109,12 @@ export default function Detail() {
             {!loading && rows.map((r, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
-                {!hidePs && <td>{r['थाना']}</td>}
-                <td>{r['अनुरोध_संख्या']}</td>
-                <td>{fmt(r['अनुरोध_दिनांक'])}</td>
-                <td>{r['आवेदक_का_नाम']}</td>
-                <td colSpan="2">{shortAddr(r['वर्तमान_पता'])}</td>
-                {!hideStatus && <td>{STATUS_MAP[r['अनुरोध_की_स्थिति']] || r['अनुरोध_की_स्थिति']}</td>}
+                {!hidePs && <td>{r['थाना'] || r.station_name}</td>}
+                <td>{r['अनुरोध_संख्या'] || r.request_number}</td>
+                <td>{fmt(r['अनुरोध_दिनांक'] || r.request_date)}</td>
+                <td>{r['आवेदक_का_नाम'] || r.applicant_name}</td>
+                <td colSpan="2">{shortAddr(r['वर्तमान_पता'] || r.present_address)}</td>
+                {!hideStatus && <td>{STATUS_MAP[r['अनुरोध_की_स्थिति'] || r.current_status] || r['अनुरोध_की_स्थिति'] || r.current_status}</td>}
               </tr>
             ))}
           </tbody>
@@ -110,3 +123,4 @@ export default function Detail() {
     </>
   );
 }
+

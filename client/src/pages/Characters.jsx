@@ -2,50 +2,68 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
+import {formatDate} from '../utils/dataConvertor';
+
+
+const MODULE_NAMES = {
+  character: 'चरित्र प्रमाण पत्र',
+  tenant: 'किरायेदार सत्यापन',
+  domestic: 'घरेलू सहायक सत्यापन',
+  employee: 'कर्मचारी सत्यापन',
+  complaints: 'शिकायत निवारण',
+  all: 'सत्यापन',
+};
 
 const LOC_HEADINGS = {
-  totaldcp:     'कुल डीसीपी पर लम्बित चरित्र प्रमाण पत्र',
-  totalliu:     'कुल एलआईयू पर लम्बित चरित्र प्रमाण पत्र',
-  totaldcrb:    'कुल डीसीआरबी पर लम्बित चरित्र प्रमाण पत्र',
-  totalps:      'कुल थानों पर लम्बित चरित्र प्रमाण पत्र',
-  totalremain:  'समस्त पश्चिमी जोन पर लम्बित चरित्र प्रमाण पत्र',
-  totaldiff:    'अन्य थानों से सम्बन्धित लम्बित चरित्र प्रमाण पत्र',
+  totaldcp:     'कुल डीसीपी पर लम्बित',
+  totalliu:     'कुल एलआईयू पर लम्बित',
+  totaldcrb:    'कुल डीसीआरबी पर लम्बित',
+  totalps:      'कुल थानों पर लम्बित',
+  totalremain:  'समस्त पश्चिमी जोन पर लम्बित',
+  totaldiff:    'अन्य थानों से सम्बन्धित लम्बित',
 };
 
-// Status map: long Hindi string → short code
-const STATUS_MAP = {
-  'वर्तमान पता :- (पूछताछ अधिकारी निरुपित / स्वीकृत डी सी आर बी द्वारा / स्वीकृत एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'PS/DCP',
-  'वर्तमान पता :- (पूछताछ अधिकारी निरुपित / जमा करने के लिए लंबित डी सी आर बी द्वारा / स्वीकृत एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'PS/DCRB/LIU/DCP',
-  'वर्तमान पता :- (पूछताछ अधिकारी समनुदेशन के लिए लंबित / जमा करने के लिए लंबित डी सी आर बी द्वारा / जमा करने के लिए लंबित एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'PS/DCRB/LIU/DCP',
-  'वर्तमान पता :- (पूछताछ अधिकारी निरुपित / जमा करने के लिए लंबित डी सी आर बी द्वारा / जमा करने के लिए लंबित एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'PS/DCRB/LIU/DCP',
-  'वर्तमान पता :- (पुलिस स्टेशन द्वारा सत्यापन पूर्ण किया गया / जमा करने के लिए लंबित डी सी आर बी द्वारा / स्वीकृत एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'DCRB/DCP',
-  'वर्तमान पता :- (पुलिस स्टेशन द्वारा सत्यापन पूर्ण किया गया / स्वीकृत डी सी आर बी द्वारा / स्वीकृत एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'DCP',
-  'वर्तमान पता :- (पूछताछ अधिकारी समनुदेशन के लिए लंबित / जमा करने के लिए लंबित डी सी आर बी द्वारा / स्वीकृत एल आई यू द्वारा ) - और एस.पी. / एस.एस.पी.से लंबित कार्यवाही': 'PS/DCRB/DCP',
-};
-
-const hideStatus = (loc) => ['totaldcp','totalliu','totaldcrb','totalps'].includes(loc);
+ 
+const hideStatus = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
 const hidePraAdd = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
 
 function fmt(d) { return d ? d.split('-').reverse().join('-') : ''; }
-function shortAddr(addr) { return (addr || '').replace('पश्चिमी (कमिश्नरेट आगरा) उत्तर प्रदेश', ''); }
 
 export default function Characters() {
   const [searchParams] = useSearchParams();
   const loc = searchParams.get('loc') || 'totalremain';
+  const type = searchParams.get('type') || 'character';
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const tableRef = useRef(null);
 
-  useEffect(() => {
-    setLoading(true);
-    setError('');
-    setRows([]);
-    axios.get('/pending', { params: { loc } })
-      .then(res => setRows(res.data || []))
-      .catch(e => setError(e.response?.data?.error || e.message))
-      .finally(() => setLoading(false));
-  }, [loc]);
+useEffect(() => {
+  console.log("called charcters.jsx useEffect", loc, type);
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError("");
+      setRows([]);
+
+      const res = await axios.get("/characterList", {
+        params: {
+          loc,
+          type,
+        },
+      });
+
+      setRows(res.data || []);
+    } catch (e) {
+      setError(e.response?.data?.error || e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchData();
+}, [loc, type]);
+
 
   function printTable() {
     if (!tableRef.current) return;
@@ -60,7 +78,9 @@ export default function Characters() {
     setTimeout(() => w.close(), 10);
   }
 
-  const heading = LOC_HEADINGS[loc] || '';
+  const moduleName = MODULE_NAMES[type] || MODULE_NAMES.character;
+  const locHeading = LOC_HEADINGS[loc] || '';
+  const heading = `${locHeading} ${moduleName}`.trim();
   const hideStatusCol = hideStatus(loc);
   const hidePraAddCol = hidePraAdd(loc);
 
@@ -78,18 +98,18 @@ export default function Characters() {
         <table id="printable" ref={tableRef}>
           <thead>
             {heading && (
-              <tr><th colSpan="8" style={{ textAlign: 'center' }}>{heading}</th></tr>
+              <tr><th colSpan="9" style={{ textAlign: 'center', fontSize: '18px' }}>{heading}</th></tr>
             )}
             <tr>
-              <th>क्र0सं0</th>
-              <th>थाना</th>
-              <th>अनुरोध संख्या</th>
-              <th>अनुरोध_दिनांक</th>
-              <th>आवेदक का नाम</th>
-              <th>वर्तमान पता</th>
-              {!hidePraAddCol && <th>स्थायी पता</th>}
-              {!hideStatusCol && <th>स्थिति</th>}
-              <th>स्थिति (पूर्ण)</th>
+              <th>Sr.No.</th>
+              <th>POLICE STATION</th>
+              <th>REQUEST NUMBER</th>
+              <th>REQUEST DATE</th>
+              <th>APPLICANT NAME</th>
+              <th>PRESENT ADDRESS</th>
+              <th> PRESENT ADD STATUS</th>
+              {!hidePraAddCol && <th>PERMANENT ADDRESS</th>}
+              {!hideStatusCol && <th> PERMANENT ADD STATUS</th>}
             </tr>
           </thead>
           <tbody id="pending_Details">
@@ -102,14 +122,15 @@ export default function Characters() {
             {!loading && rows.map((r, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
-                <td>{r['थाना']}</td>
-                <td>{r['अनुरोध_संख्या']}</td>
-                <td>{fmt(r['अनुरोध_दिनांक'])}</td>
-                <td>{r['आवेदक_का_नाम']}</td>
-                <td>{shortAddr(r['वर्तमान_पता'])}</td>
-                {!hidePraAddCol && <td>{r['स्थायी_पता']}</td>}
-                {!hideStatusCol && <td>{STATUS_MAP[r['अनुरोध_की_स्थिति']] || r['अनुरोध_की_स्थिति']}</td>}
-                <td>{r['अनुरोध_की_स्थिति']}</td>
+                <td>{r['थाना'] || r.pre_station}</td>
+                <td>{r['अनुरोध_संख्या'] || r.request_number}</td>
+                <td>{formatDate(r['अनुरोध_दिनांक'] || r.request_date)}</td>
+                <td>{r['आवेदक_का_नाम'] || r.applicant_name}</td>
+                <td>{r.present_address}</td>
+                <td>{r.pre_Current_Status}</td>
+
+                {!hidePraAddCol && <td>{ r.permanent_address}</td>}
+                {!hideStatusCol && <td>{ r.per_Current_Status}</td>}
               </tr>
             ))}
           </tbody>
@@ -118,3 +139,4 @@ export default function Characters() {
     </>
   );
 }
+

@@ -8,6 +8,100 @@ const {
   makePlaceholders,
 } = require('../constants/statusConstants');
 
+
+
+
+const Dashboard = async (req, res, next) => {
+  console.log('Dashboard request received with query:', req.query);
+  try {
+    const { type, sdate, edate } = req.query;
+    
+    const [stationRows] = await pool.execute(`
+      
+SELECT
+    pre_station,
+    pre_station_code,
+    COUNT(*) AS request_count,
+
+    SUM(pre_Current_Status LIKE '%APPROVED%') AS approved_count,
+    SUM(pre_Current_Status LIKE '%REJECTED%') AS rejected_count,
+
+    (
+        COUNT(*)
+        - SUM(pre_Current_Status LIKE '%APPROVED%')
+        - SUM(pre_Current_Status LIKE '%REJECTED%')
+    ) AS pending_count,
+    SUM(pre_Current_Status LIKE '%PS%')   AS pending_ps_count,
+    SUM(pre_Current_Status LIKE '%DCRB%') AS pending_dcrb_count,
+    SUM(pre_Current_Status LIKE '%LIU%')  AS pending_liu_count,
+    SUM(pre_Current_Status LIKE '%DCP%')  AS pending_dcp_count,
+    SUM( per_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP','DCP')) AS link_to_other_ps
+
+
+FROM characters
+
+GROUP BY
+    pre_station,
+    pre_station_code
+
+ORDER BY pre_station`);
+
+    const agingSummary = await fetchAgingSummary(sdate, edate);
+
+    res.json({
+      stationRows: stationRows || [],
+      agingSummary: agingSummary || [],
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
+const characterList = async (req, res, next) => {
+  try {
+    const { loc, type } = req.query;
+    if (!loc || !type) {
+      return res.status(400).json({ error: 'loc and type parameters are required' });
+    }
+
+    let query = '';
+    let params = [];
+
+    if (loc === 'totaldcp') {
+      query = `SELECT * FROM characters WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP','DCP') ORDER BY pre_station, request_date`;
+    } else if (loc === 'totalliu') {
+      query = `SELECT * FROM characters WHERE pre_Current_Status IN ( 'PS/DCRB/LIU/DCP') ORDER BY pre_station, request_date`;
+    } else if (loc === 'totalps') {
+      query = `SELECT * FROM characters WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP') ORDER BY pre_station, request_date`;
+    } else if (loc === 'totaldcrb') {
+       query = `SELECT * FROM characters WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP') ORDER BY pre_station, request_date`;
+    } else if (loc === 'totalremain') {
+        query = `SELECT * FROM characters WHERE pre_Current_Status NOT IN ('APPROVED','REJECTED') ORDER BY pre_station, request_date`;  
+    } else if (loc === 'totaldiff') {
+      query = `SELECT * FROM characters WHERE pre_station_code <> per_station_code ORDER BY pre_station, request_date`;
+    } else {
+    }
+
+    const [rows] = await pool.execute(query, params);
+    console.log(rows);
+    res.json(rows);
+  } catch (err) {
+    next(err);
+  }
+};    
+
+
+
+
+
+
+
+
+
+
+
+
 // Dynamic helper to resolve ps source
 const getPsSource = async () => {
   try {
@@ -61,33 +155,67 @@ const getMaxDate = async (req, res, next) => {
   }
 };
 
-const Dashboard = async (req, res, next) => {
-  console.log('Dashboard request received with query:', req.query);
-  try {
-    const data = await pool.execute(`
-                                SELECT
-                                    station_name,
-                                    station_code,
-                                    COUNT(*) AS request_count,
-                                    
-                                    SUM(current_status LIKE '%APPROVED%') AS approved_count,
-                                    SUM(current_status LIKE '%REJECTED%') AS rejected_count,
+const STANDARD_APP_TYPES = [
+  'कर्मचारी सत्यापन',
+  'घरेलू सहायता सत्यापन',
+  'चरित्र सत्यापन',
+  'पोस्टमार्टम रिपोर्ट अनुरोध',
+  'शिकायत',
+];
 
-                                    (
-                                        COUNT(*)
-                                        - SUM(current_status LIKE '%APPROVED%')
-                                        - SUM(current_status LIKE '%REJECTED%')
-                                    ) AS pending_count,
-                                  SUM(current_status LIKE '%PS%')    AS pending_ps_count,
-                                    SUM(current_status LIKE '%DCRB%')  AS pending_dcrb_count,
-                                    SUM(current_status LIKE '%LIU%')   AS pending_liu_count,
-                                    SUM(current_status LIKE '%DCP%')   AS pending_dcp_count
-                                FROM characters
-                                GROUP BY station_name, station_code
-                                ORDER BY station_name`);
-    res.json(data[0]);
+const fetchAgingSummary = async (sdate, edate) => {
+  let where = `WHERE 1=1`;
+  const params = [];
+  if (sdate && edate) {
+    where += ` AND (अनुरोध_दिनांक BETWEEN ? AND ? OR request_date BETWEEN ? AND ?)`;
+    params.push(sdate, edate, sdate, edate);
+  }
+
+  try {
+    const [maxRows] = await pool.execute('SELECT MAX(COALESCE(अनुरोध_दिनांक, request_date)) as maxDate FROM characters');
+    const refDateSql = maxRows[0]?.maxDate ? `'${new Date(maxRows[0].maxDate).toISOString().slice(0,10)}'` : 'CURDATE()';
+
+    const sql = `
+      SELECT 
+        COALESCE(NULLIF(service, ''), 'चरित्र सत्यापन') AS app_type,
+        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) <= 15 THEN 1 ELSE 0 END) AS d15,
+        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 16 AND 30 THEN 1 ELSE 0 END) AS d30,
+        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 31 AND 90 THEN 1 ELSE 0 END) AS d90,
+        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 91 AND 180 THEN 1 ELSE 0 END) AS d180,
+        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 181 AND 365 THEN 1 ELSE 0 END) AS d365,
+        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) > 365 THEN 1 ELSE 0 END) AS dAbove1,
+        COUNT(*) as total_count
+      FROM characters
+      ${where}
+      GROUP BY app_type
+    `;
+    const [rows] = await pool.execute(sql, params);
+    
+    // Merge with standard 5 types to match exact image layout
+    const resultMap = new Map();
+    rows.forEach(r => resultMap.set(r.app_type, r));
+
+    return STANDARD_APP_TYPES.map((type, idx) => {
+      const found = resultMap.get(type) || {};
+      return {
+        sno: idx + 1,
+        app_type: type,
+        d15: Number(found.d15 || 0),
+        d30: Number(found.d30 || 0),
+        d90: Number(found.d90 || 0),
+        d180: Number(found.d180 || 0),
+        d365: Number(found.d365 || 0),
+        dAbove1: Number(found.dAbove1 || 0),
+        total_count: Number(found.total_count || 0),
+      };
+    });
   } catch (err) {
-    next(err);
+    console.error('Aging summary query error:', err.message);
+    return STANDARD_APP_TYPES.map((type, idx) => ({
+      sno: idx + 1,
+      app_type: type,
+      d15: 0, d30: 0, d90: 0, d180: 0, d365: 0, dAbove1: 0, total_count: 0
+    }));
   }
 };
 
@@ -248,4 +376,5 @@ module.exports = {
   getDetails,
   getRemain,
   uploadFile,
+  characterList
 };

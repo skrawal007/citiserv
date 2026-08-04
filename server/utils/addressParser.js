@@ -36,7 +36,7 @@ function parseAddress(fullAddress = '', district = '') {
 }
 
 
-function findAddressDetails(address, districtMap) {
+function findAddressDetailsx(address, districtMap) {
 
     for (const [districtHindiName, districtData] of districtMap) {
 
@@ -83,6 +83,74 @@ function findAddressDetails(address, districtMap) {
         station_code: null,
         address
     };
+}
+
+function findAddressDetails(address, districtMap) {
+    // Find the district that appears furthest to the right
+    let matchedDistrict = null;
+
+    for (const [districtHindiName, districtData] of districtMap) {
+        const index = address.lastIndexOf(districtHindiName);
+
+        if (index === -1) continue;
+
+        if (
+            !matchedDistrict ||
+            index > matchedDistrict.index ||
+            (index === matchedDistrict.index &&
+             districtHindiName.length > matchedDistrict.name.length)
+        ) {
+            matchedDistrict = {
+                index,
+                name: districtHindiName,
+                data: districtData
+            };
+        }
+    }
+
+    if (!matchedDistrict) {
+        return {
+            district_name: null,
+            district_hindi_name: null,
+            district_code: null,
+            station_name: null,
+            station_hindi_name: null,
+            station_code: null,
+            address
+        };
+    }
+
+    const { name: districtHindiName, data: districtData } = matchedDistrict;
+
+    const result = {
+        district_name: districtData.district_name,
+        district_hindi_name: districtData.district_hindi_name,
+        district_code: districtData.district_code,
+        station_name: null,
+        station_hindi_name: null,
+        station_code: null,
+        address
+    };
+
+    // Search station only within the matched district
+    for (const [stationHindiName, stationData] of districtData.stations) {
+        if (address.includes(stationHindiName)) {
+            result.station_name = stationData.station_name;
+            result.station_hindi_name = stationData.station_hindi_name;
+            result.station_code = stationData.station_code;
+
+            result.address = address
+                .replace(stationHindiName, "")
+                .replace(districtHindiName, "")
+                .replace(/उत्तर\s*प्रदेश/gi, "")
+                .replace(/\s+/g, " ")
+                .trim();
+
+            break;
+        }
+    }
+
+    return result;
 }
 
 

@@ -1,15 +1,29 @@
 import { useState, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import LoadingOverlay from '../components/LoadingOverlay';
 
+const MODULE_NAMES = {
+  character: 'Character Verification',
+  tenant: 'Tenant Verification',
+  domestic: 'Domestic Help Verification',
+  employee: 'Employee Verification',
+  complaints: 'Complaints Data',
+  all: 'Verification Data',
+};
+
 export default function Upload() {
+  const [searchParams] = useSearchParams();
+  const type = searchParams.get('type') || 'character';
   const [uploading, setUploading] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [summary, setSummary] = useState(null);
   const [error, setError] = useState('');
   const fileRef = useRef(null);
+
+  const moduleTitle = MODULE_NAMES[type] || MODULE_NAMES.character;
 
   function validateFile(file) {
     if (!file) return false;
@@ -81,6 +95,7 @@ export default function Upload() {
     try {
       const formData = new FormData();
       formData.append('excel_file', file);
+      formData.append('type', type);
 
       const res = await axios.post('/upload', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -126,7 +141,7 @@ export default function Upload() {
       <div className="upload-page-container">
         <div className="upload-card">
           <div className="upload-card-header">
-            <h2>Character Verification Data Import</h2>
+            <h2>{moduleTitle} Data Import</h2>
             <p>Upload Excel file (<b>.XLS</b> or <b>.XLSX</b> format)</p>
           </div>
 
@@ -184,7 +199,7 @@ export default function Upload() {
               onClick={handleUpload}
               disabled={uploading || !selectedFile}
             >
-              {uploading ? 'Processing...' : 'Upload & Import File'}
+              {uploading ? 'Processing...' : `Upload & Import ${moduleTitle}`}
             </button>
             <button id="reset_btn" className="btn-reset" onClick={handleReset}>
               Reset
@@ -239,3 +254,4 @@ export default function Upload() {
     </>
   );
 }
+

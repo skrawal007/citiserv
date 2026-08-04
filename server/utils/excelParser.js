@@ -17,7 +17,6 @@ const processExcelBuffer = async (fileBuffer) => {
 });
   // Detect district title
   let titleDistrict = "";
-  let districtName = "";
 
   // Detect header row
   let headerRowIdx = 1;
@@ -69,10 +68,6 @@ const processExcelBuffer = async (fileBuffer) => {
     "वर्तमान पता",
     "स्थायी पता"
   ];
-
-
-
-
   const isEnglishFormat = englishHeaders.every(h => headerRow.includes(h));
   const isHindiFormat = hindiHeaders.every(h => headerRow.includes(h));
   const isHindiFormat2 = hindiHeaders2.every(h => headerRow.includes(h));
@@ -80,35 +75,6 @@ const processExcelBuffer = async (fileBuffer) => {
 
   if (!isEnglishFormat && ! isHindiFormat && !isHindiFormat2) {
     throw new Error("Invalid Excel format.");
-  }
-
-  // Continue processing...
-  if (isEnglishFormat) {
-    console.log("English format detected.");
-
-    for (let i = 0; i < headerRowIdx; i++) {
-      const titleStr = (rows[i] || [])
-        .map((c) => String(c || "").trim())
-        .join(" ");
-      if (
-        titleStr.includes("जनपद") ||
-        titleStr.toLowerCase().includes("district")
-      ) {
-        titleDistrict = titleStr;
-        break;
-      }
-    }
-    console.log("Detected titleDistrict: ", titleDistrict);
-    districtName = titleDistrict.replace(/^जनपद-\s*/, "").trim();
-
-  }
-
-  if (isHindiFormat) {
-    console.log("Hindi format detected.");
-  }
-
-  if (isHindiFormat2) {
-    console.log("Hindi format 2 detected.");
   }
 
   if (rows.length < 2) {
@@ -141,10 +107,6 @@ const processExcelBuffer = async (fileBuffer) => {
     }
   }
   if (headerRowIdx === -1) headerRowIdx = 1;
-
-console.log("Detected district name: ", districtName);
-
-
 
   const [stationDistrictList] = await pool.execute(`SELECT 
             district_.code AS district_code,
@@ -180,55 +142,11 @@ console.log("Detected district name: ", districtName);
     );
   }
 
-  // console.log("districtMap size: ", districtMap);
-
-  let [districts] = await pool.execute(
-    "select * from district_ WHERE hindi_name IS NOT NULL AND r_id IS NOT NULL AND hindi_name = ? ",
-    [districtName],
-  );
-
-  if (districts.length === 0) {
-    // Fallback search by wildcard or default to Agra district
-    const [fallbackDistricts] = await pool.execute(
-      "select * from district_ WHERE hindi_name IS NOT NULL AND r_id IS NOT NULL LIMIT 1"
-    );
-    if (fallbackDistricts.length > 0) {
-      districts = fallbackDistricts;
-    } else {
-      throw new Error(`District not found: ${districtName}`);
-    }
-  }
-
-  console.log(districts[0]);
-  console.log("district code ", districts[0].code);
-  let district_code = districts[0].code;
-  let district_name = districts[0].name;
-  const [getStationList] = await pool.execute(
-    "SELECT * FROM station_ WHERE district_code = ?",
-    [district_code],
-  );
-  // console.log(getStationList);
-
-  const stationMap = new Map(
-    getStationList.map((station) => [
-      station.hindi_name.trim(),
-      {
-        code: station.code,
-        name: station.name,
-      },
-    ]),
-  );
-
-  // const headers = rows[headerRowIdx];
-  // const dataRows = rows.slice(headerRowIdx + 1);
 
   const jsonResult = [];
-  const differentAddressesPre = [];
-  const differentAddressesPer = [];
 
   let addressCounts = 0;
-  let differentAddressCountPRE = 0;
-  let differentAddressCountPER = 0;
+  let differentAddressCount = 0;
 
   for (const row of dataRows) {
     if (!row || row.length === 0) continue;
@@ -257,7 +175,7 @@ console.log("Detected district name: ", districtName);
     };
 
     let SNO = getCell("sno", "s.no", "क्र0सं0", "क्रम संख्या");
-    let DIST = getCell("जनपद", "district") || districtName;
+    let DIST = getCell("जनपद", "district");
     let PS = getCell("ps", "थाना", "police station");
     let ACK = getCell(
       "application no",
@@ -287,8 +205,27 @@ console.log("Detected district name: ", districtName);
       "permanentaddress",
     );
     // let DAYS = getCell("pending days", "लम्बित दिन", "pendingdays");
-    let Current_Status = getCell("Current Status",'अनुरोध की स्थिति');
-     Current_Status = getStatusCode(Current_Status);
+    let Current_Status = getCell("Current Status",'अनुरोध की स्थिति').replace(/\s+/g, '').trim();
+    let pre_Current_Status = null;
+    let per_Current_Status = null;
+    
+    if (!Current_Status.includes("स्थायीपता")) {
+      pre_Current_Status = getStatusCode(Current_Status);
+    } else {
+
+      // console.log("Current_Status includes स्थायी पता :-", Current_Status);
+
+      let { presentAddress, permanentAddress } = getSepareteStatus(Current_Status);
+
+      pre_Current_Status = getStatusCode(presentAddress);
+      per_Current_Status = getStatusCode(permanentAddress);
+      console.log("ACK ", ACK);
+      console.log("Current_Status includes", Current_Status);
+      console.log("presentAddress:", presentAddress);
+      console.log("pre_Current_Status:", pre_Current_Status);
+      console.log("permanentAddress:", permanentAddress);
+      console.log("per_Current_Status:", per_Current_Status);
+    }
 
     if (!ACK && !PS && !NAME) continue;
 
@@ -301,43 +238,24 @@ console.log("Detected district name: ", districtName);
 
     const rawDateVal = rawDateIdx >= 0 ? row[rawDateIdx] : ACKDAT;
     let ACKDATE = null;
-    // console.log("rawDateVal: ", rawDateVal, "ACKDAT: ", ACKDAT);
-    let stationCode = null;
-    let stationName = null;
+    
     if(hindiHeaders){
      ACKDATE = parseExcelDate(rawDateVal) || ACKDAT;
-      // console.log("inside hindiHeaders : ",getDistrictStationDetails(districtMap, DIST, PS ));
-     let districtStationDetails = getDistrictStationDetails(districtMap, DIST, PS );  
-     stationCode = districtStationDetails.station_code;
-     stationName = districtStationDetails.station_name;  
-     district_name = districtStationDetails.district_name;
-     district_code = districtStationDetails.district_code; 
-    } else if(englishHeaders){
+      } else if(englishHeaders){
       ACKDATE = convertDate(rawDateVal) || ACKDAT;
-         stationCode = stationMap.get(PS)?.code;
-         stationName = stationMap.get(PS)?.name;
     }
-    // const preAddParse = parseAddress(PRE_ADD, districtName);
-    const preAddParse = findAddressDetails(PRE_ADD, districtMap);
-    // console.log(" PER_ADD ", PER_ADD);
+    const preAddParse = findAddressDetails(PRE_ADD, districtMap);    
     const perAddParse = findAddressDetails(PER_ADD, districtMap);
 
-    // console.log(findAddressDetails(PER_ADD,districtMap) );
-  
-
     jsonResult.push({
-      station_hindi_name: PS,
-      station_Name: stationName,
-      station_Code: stationCode,
-      district_name: district_name,
-      district_code: district_code,
 
       service: SERV,
       request_number: ACK,
       request_date: ACKDATE,
       applicant_name: NAME,
       Current_Status: Current_Status,
-
+      pre_Current_Status: pre_Current_Status,
+      per_Current_Status: per_Current_Status,
       present_address: PRE_ADD,
       pre_add: preAddParse.address,
       pre_station: preAddParse.station_name,
@@ -353,27 +271,15 @@ console.log("Detected district name: ", districtName);
       per_district_code: perAddParse.district_code,
     });
 
-    if (PER_ADD.includes(districtName) && PRE_ADD.includes(districtName)) {
+    if (perAddParse.station_code === preAddParse.station_code) {
       addressCounts++;
-    } else if (
-      !PER_ADD.includes(districtName) &&
-      PRE_ADD.includes(districtName)
-    ) {
-      differentAddressCountPER++;
-    } else if (
-      PER_ADD.includes(districtName) &&
-      !PRE_ADD.includes(districtName)
-    ) {
-      differentAddressCountPRE++;
-    }
+    } else if (perAddParse.station_code !== preAddParse.station_code) {
+      differentAddressCount++;
+    } 
   }
 
-  const differentAddressCount = differentAddressCountPRE + differentAddressCountPER;
-
-  console.log(jsonResult);
+  // console.log(jsonResult);
   console.log("jsonResult.length ", jsonResult.length);
-  console.log("differentAddressCountPRE ", differentAddressCountPRE);
-  console.log("differentAddressCountPER ", differentAddressCountPER);
   console.log("addressCounts ", addressCounts);
   console.log("differentAddressCount ", differentAddressCount);
 
@@ -384,10 +290,8 @@ console.log("Detected district name: ", districtName);
     headerRowIdx,
     headers,
     totalRecords: jsonResult.length,
-    differentAddressCount,
     addressCounts,
-    differentAddressCountPRE,
-    differentAddressCountPER,
+    differentAddressCount,
     jsonResult,
   };
 
@@ -399,15 +303,11 @@ const saveCharacters = async (data) => {
 
   const sql = `
         INSERT INTO characters (
-            station_hindi_name,
-            station_name,
-            station_code,
-            district_name,
-            district_code,
             request_number,
             request_date,
             applicant_name,
-            current_status,
+            pre_Current_Status,
+            per_Current_Status,
             present_address,
             pre_add,
             pre_station,
@@ -423,20 +323,17 @@ const saveCharacters = async (data) => {
         )
         VALUES ?
         ON DUPLICATE KEY UPDATE
-            current_status = VALUES(current_status),
+            pre_Current_Status = VALUES(pre_Current_Status),
+            per_Current_Status = VALUES(per_Current_Status),
             updated_at = CURRENT_TIMESTAMP
     `;
 
   const values = data.map(item => [
-    item.station_hindi_name,
-    item.station_Name,
-    item.station_Code,
-    item.district_name,
-    item.district_code,
     item.request_number,
     item.request_date,
     item.applicant_name,
-    item.Current_Status,
+    item.pre_Current_Status,
+    item.per_Current_Status,
     item.present_address,
     item.pre_add,
     item.pre_station,
@@ -454,47 +351,75 @@ const saveCharacters = async (data) => {
   await pool.query(sql, [values]);
 }
 
-
 function getStatusCode(statusText) {
-  const pending = [];
-
-  // Police Station
-  if (
-    statusText.includes('पूछताछ अधिकारी समनुदेशन के लिए लंबित') ||
-    statusText.includes('पूछताछ अधिकारी निरुपित')
+  let cleanedStatus = statusText.replace(/\s+/g, '').trim()
+    if (
+    statusText.includes('वर्तमानपता:-') ||
+    statusText.includes('स्थायीपता:-')
   ) {
-    pending.push('PS');
+    cleanedStatus = statusText
+      .replace(/वर्तमानपता\s*:-/g, '')
+      .replace(/स्थायीपता\s*:-/g, '')
+      .trim();
   }
+    if (!cleanedStatus) {
+    return '';
+  }
+  const STATUS_MAP = {
+    
+'(पूछताछअधिकारीनिरुपित/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCP',
 
-  // DCRB
-  if (
-    statusText.includes('अस्वीकृत डी सी आर बी') ||
-    statusText.includes('जमा करने के लिए लंबित डी सी आर बी')
-  ) {
-    pending.push('DCRB');
-  }
+'(पूछताछअधिकारीनिरुपित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/LIU/DCP',
 
-  // LIU
-  if (
-    statusText.includes('अस्वीकृत एल आई यू') ||
-    statusText.includes('जमा करने के लिए लंबित एल आई यू')
-  ) {
-    pending.push('LIU');
-  }
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/जमाकरनेकेलिएलंबितएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/LIU/DCP',
 
-  // SP/SSP (DCP)
-  if (statusText.includes('एस.पी. / एस.एस.पी.से लंबित कार्यवाही')) {
-    pending.push('DCP');
-  }
-  // Approved / Rejected
-  if (statusText === 'स्वीकृत') {
-    pending.push('APPROVED');
-  }
-  if (statusText === 'अस्वीकृत') {
-    pending.push('REJECTED');
-  }
+'(पूछताछअधिकारीनिरुपित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/जमाकरनेकेलिएलंबितएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/LIU/DCP',
 
-  return pending.join('/');
+'(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'DCRB/DCP',
+
+'(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'DCP',
+
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/DCP',
+
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCP',
+
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/अस्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCP',
+
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)': 'PS/DCRB',
+
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/जमाकरनेकेलिएलंबितएलआईयूद्वारा)': 'PS/DCRB/LIU',
+'(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/जमाकरनेकेलिएलंबितएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही':'DCRB/LIU/DCP',
+'(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/अस्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही':'DCP',
+'(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)':"PS",
+'(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)':'APPROVED',
+'स्वीकृत': 'APPROVED',
+'अस्वीकृत': 'REJECTED',
+};
+  return STATUS_MAP[cleanedStatus] || 'ok';
 }
 
+function getSepareteStatus(text) {
+    const parts = text.split("-");
+console.log("parts length  ", parts.length);
+// console.log("part[1]", parts[1]);
+// console.log("part[2]", parts[2]);
+// console.log("part[3]", parts[3]);
+// console.log("part[4]", parts[4]);
+// console.log("part[5]", parts[5]);
+    if (parts.length < 4) {
+        return {
+            presentAddress: "",
+            permanentAddress: ""
+        };
+    }
+
+    const presentAddress = `${parts[1]}-${parts[4]}`;
+
+    const permanentAddress = `${parts[3]}`;
+
+    return {
+        presentAddress,
+        permanentAddress
+    };
+}
 module.exports = { parseExcelDate, processExcelBuffer, saveCharacters };
