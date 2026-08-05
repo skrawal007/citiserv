@@ -7,8 +7,10 @@ import CharacterModule from '../components/dashboard/CharacterModule';
 import DomesticModule from '../components/dashboard/DomesticModule';
 import TenantModule from '../components/dashboard/TenantModule';
 import EmployeeModule from '../components/dashboard/EmployeeModule';
+import getAuthConfig from "../functions/getAuthConfig";
 
-// Standard 5 Application types from reference image
+
+// Reference Aging Dataset
 const DEFAULT_AGING_DATA = [
   { sno: 1, typeKey: 'employee', label: 'कर्मचारी सत्यापन', d15: 32, d30: 0, d90: 0, d180: 2, d365: 0, dAbove1: 0 },
   { sno: 2, typeKey: 'domestic', label: 'घरेलू सहायता सत्यापन', d15: 9, d30: 4, d90: 2, d180: 0, d365: 0, dAbove1: 0 },
@@ -22,9 +24,9 @@ export default function Dashboard() {
   const typeParam = searchParams.get('type');
   const locParam = searchParams.get('loc');
 
-  // Handle active component states
-  const [activeModule, setActiveModule] = useState(null); // null (for main aging summary), 'character', 'domestic', 'tenant', 'employee'
-  const [activeFilter, setActiveFilter] = useState(null); // null, 'totalps', 'totalliu', 'totaldcrb', 'totaldcp', 'totaldiff'
+  // Handle active component states: null (Overview), 'character', 'domestic', 'tenant', 'employee'
+  const [activeModule, setActiveModule] = useState(null);
+  const [activeFilter, setActiveFilter] = useState(null);
 
   const [agingRows, setAgingRows] = useState(DEFAULT_AGING_DATA);
   const [showSearch, setShowSearch] = useState(false);
@@ -33,14 +35,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-
-
-  // Synchronize state with URL parameters (for navbar links support)
+  // Synchronize state with URL parameters
   useEffect(() => {
     if (typeParam && ['character', 'domestic', 'tenant', 'employee'].includes(typeParam)) {
       setActiveModule(typeParam);
       setActiveFilter(locParam || null);
-    } else if (typeParam === 'all' || !typeParam) {
+    } else {
       setActiveModule(null);
       setActiveFilter(null);
     }
@@ -54,7 +54,7 @@ export default function Dashboard() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.get('/dashboard', { params: { type: 'all' } });
+const res = await axios.get('/dashboard', {   params: { type: 'all' },   ...getAuthConfig(), });
       if (res.data && res.data.agingSummary && Array.isArray(res.data.agingSummary) && res.data.agingSummary.length > 0) {
         const merged = DEFAULT_AGING_DATA.map(def => {
           const found = res.data.agingSummary.find(r => r.app_type === def.label);
@@ -74,7 +74,7 @@ export default function Dashboard() {
         setAgingRows(merged);
       }
     } catch (e) {
-      console.warn('Using default reference aging dataset:', e.message);
+      console.warn('Using default aging dataset:', e.message);
     } finally {
       setLoading(false);
     }
@@ -86,7 +86,7 @@ export default function Dashboard() {
     setLoading(true);
     setShowSearch(false);
     try {
-      const res = await axios.get('/dashboard', { params: { sdate, edate, type: 'all' } });
+      const res = await axios.get('/dashboard', { params: { sdate, edate, type: 'all' } }, getAuthConfig());
       if (res.data?.agingSummary) setAgingRows(res.data.agingSummary);
     } catch (e) {
       setError(e.response?.data?.error || e.message);
@@ -95,17 +95,15 @@ export default function Dashboard() {
     }
   }
 
-  const handleSelectModule = (mod, filter) => {
-    setActiveModule(mod);
-    setActiveFilter(filter);
-    // Update search query params
-    setSearchParams({ type: mod, loc: filter });
-  };
-
-  const handleResetDashboard = () => {
-    setActiveModule(null);
-    setActiveFilter(null);
-    setSearchParams({ type: 'all' });
+  const handleSelectModule = (mod) => {
+    if (mod === 'all' || !mod) {
+      setActiveModule(null);
+      setActiveFilter(null);
+      setSearchParams({});
+    } else {
+      setActiveModule(mod);
+      setSearchParams({ type: mod });
+    }
   };
 
   // Calculate Aging Totals
@@ -125,19 +123,21 @@ export default function Dashboard() {
     <>
       <Navbar />
 
-      <div className="dashboard-container">
+      <div className="dashboard-container" style={{ padding: '20px 30px' }}>
+
+        
 
         {/* Search Modal */}
         {showSearch && (
           <div className="search-modal-overlay">
             <form className="search-form" onSubmit={handleSearch}>
-              <h2>Search Records</h2>
+              <h2>दिनांक द्वारा रिकॉर्ड खोजें</h2>
               <div className="inputs">
-                <label>From Date</label>
+                <label>आरम्भ दिनांक (From Date)</label>
                 <input type="date" value={sdate} onChange={e => setSdate(e.target.value)} />
               </div>
               <div className="inputs">
-                <label>To Date <span style={{ color: 'red' }}>*</span></label>
+                <label>अंतिम दिनांक (To Date) <span style={{ color: 'red' }}>*</span></label>
                 <input type="date" value={edate} onChange={e => setEdate(e.target.value)} required />
               </div>
               <div className="btn-container">
@@ -149,19 +149,44 @@ export default function Dashboard() {
         )}
 
         {/* ── DYNAMIC SUB-COMPONENT DISPLAY AREA ── */}
-        <div className="main-content-display-area" style={{ marginTop: '24px' }}>
+        <div className="main-content-display-area" style={{ marginTop: '12px' }}>
           
-          {/* Landing State: Main Dashboard Aging Summary Table */}
+          {/* Landing Overview: Shows Metric Summary Cards & Aging Summary Table */}
           {!activeModule && (
             <>
-              <div className="dashboard-header-actions">
-                <div style={{ flex: 1 }}></div>
-                <button className="search-trigger-btn" onClick={() => setShowSearch(true)}>
-                  🔍 दिनांक द्वारा खोजें
-                </button>
+              {/* Stat Cards Grid */}
+              <div className="dashboard-stats-grid" style={{ marginBottom: '24px' }}>
+                <div className="stat-card blue">
+                  <div className="stat-icon">📑</div>
+                  <div className="stat-info">
+                    <span className="stat-title">कुल प्राप्त आवेदन</span>
+                    <span className="stat-number">1,791</span>
+                  </div>
+                </div>
+                <div className="stat-card orange">
+                  <div className="stat-icon">⏳</div>
+                  <div className="stat-info">
+                    <span className="stat-title">लम्बित सत्यापन</span>
+                    <span className="stat-number">1,788</span>
+                  </div>
+                </div>
+                <div className="stat-card teal">
+                  <div className="stat-icon">✅</div>
+                  <div className="stat-info">
+                    <span className="stat-title">सत्यापित एवं निस्तारित</span>
+                    <span className="stat-number">3</span>
+                  </div>
+                </div>
+                <div className="stat-card purple">
+                  <div className="stat-icon">🏢</div>
+                  <div className="stat-info">
+                    <span className="stat-title">थाने स्तर पर लम्बित</span>
+                    <span className="stat-number">1,747</span>
+                  </div>
+                </div>
               </div>
 
-              {loading && <div style={{ textAlign: 'center', padding: '20px', color: '#1e293b' }}>लोड हो रहा है...</div>}
+              {loading && <div style={{ textAlign: 'center', padding: '20px', color: '#1e293b' }}>डेटा लोड हो रहा है...</div>}
               {error && <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>{error}</div>}
               
               {!loading && !error && (
@@ -170,7 +195,7 @@ export default function Dashboard() {
             </>
           )}
 
-          {/* Module 1: Character (Containing the Satyapan table!) */}
+          {/* Module 1: Character (Contains the Satyapan Station Table) */}
           {activeModule === 'character' && (
             <CharacterModule activeFilter={activeFilter} />
           )}

@@ -1,3 +1,5 @@
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const { pool } = require('../database/db');
 const { processExcelBuffer } = require('../utils/excelParser');
 const {
@@ -10,41 +12,133 @@ const {
 
 
 
+const characterList = async (req, res,next) => {
+
+  console.log('Character list request received with query:', req.query);
+    console.log("TOKEN USER DATA:", req.user);
+
+  try {
+    const{userid, username, usertype} = req.user;
+    const { loc, type } = req.query;
+    if (!loc || !type) {
+      return res.status(400).json({ error: 'loc and type parameters are required' });
+    }
+    let query = '';
+
+    let firstCondition = `SELECT * FROM characters
+                          JOIN user_district ON user_district.district_id = characters.pre_district_id `
+
+    let lastCondition = `AND user_district.user_id = ? 
+                        ORDER BY pre_station, request_date`;
+    if (loc === 'totaldcp') {
+      query = `${firstCondition}
+                WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP','DCP') 
+                ${lastCondition}`;
+    } else if (loc === 'totalliu') {
+      query = `${firstCondition}
+            WHERE pre_Current_Status IN ( 'PS/DCRB/LIU/DCP') 
+            ${lastCondition}`;
+    } else if (loc === 'totalps') {
+      query = `${firstCondition}
+      WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP') ${lastCondition}`;
+    } else if (loc === 'totaldcrb') {
+       query = `${firstCondition}
+       WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP') ${lastCondition}`;
+    } else if (loc === 'totalremain') {
+        query = `${firstCondition}
+        WHERE pre_Current_Status NOT IN ('APPROVED','REJECTED') ${lastCondition}  `;  
+    } else if (loc === 'totaldiff') {
+      query = `${firstCondition}
+      WHERE pre_station_code <> per_station_code ${lastCondition}`;
+    } else if(loc ==='OTHER_TO_OWN_PS'){
+            query = `SELECT * FROM characters
+                JOIN user_district ON user_district.district_id = characters.per_district_id
+                WHERE pre_station_id<>per_station_id ${lastCondition}`;      
+    }
+
+    const [rows] = await pool.execute(query, [userid]);
+    // console.log(rows);
+    res.json(rows);
+  } catch (err) {
+    console.error("Error fetching character list:", err);
+  }
+};    
+
+
+
 
 const Dashboard = async (req, res, next) => {
   console.log('Dashboard request received with query:', req.query);
+  console.log("TOKEN USER DATA:", req.user);
   try {
     const { type, sdate, edate } = req.query;
+    const { userid, username, usertype } = req.user;
     
     const [stationRows] = await pool.execute(`
-      
 SELECT
-    pre_station,
-    pre_station_code,
-    COUNT(*) AS request_count,
+    p.pre_station,
+    p.pre_station_code,
+    p.request_count,
+    p.approved_count,
+    p.rejected_count,
+    p.pending_count,
+    p.pending_ps_count,
+    p.pending_dcrb_count,
+    p.pending_liu_count,
+    p.pending_dcp_count,
+    p.own_to_other,
+    COALESCE(o.other_to_own, 0) AS other_to_own
+FROM
+(
+    SELECT
+        c.pre_station,
+        c.pre_station_code,
+        COUNT(*) AS request_count,
 
-    SUM(pre_Current_Status LIKE '%APPROVED%') AS approved_count,
-    SUM(pre_Current_Status LIKE '%REJECTED%') AS rejected_count,
+        SUM(c.pre_Current_Status LIKE '%APPROVED%') AS approved_count,
+        SUM(c.pre_Current_Status LIKE '%REJECTED%') AS rejected_count,
 
-    (
         COUNT(*)
-        - SUM(pre_Current_Status LIKE '%APPROVED%')
-        - SUM(pre_Current_Status LIKE '%REJECTED%')
-    ) AS pending_count,
-    SUM(pre_Current_Status LIKE '%PS%')   AS pending_ps_count,
-    SUM(pre_Current_Status LIKE '%DCRB%') AS pending_dcrb_count,
-    SUM(pre_Current_Status LIKE '%LIU%')  AS pending_liu_count,
-    SUM(pre_Current_Status LIKE '%DCP%')  AS pending_dcp_count,
-    SUM( per_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP','DCP')) AS link_to_other_ps
+        - SUM(c.pre_Current_Status LIKE '%APPROVED%')
+        - SUM(c.pre_Current_Status LIKE '%REJECTED%') AS pending_count,
 
+        SUM(c.pre_Current_Status LIKE '%PS%')   AS pending_ps_count,
+        SUM(c.pre_Current_Status LIKE '%DCRB%') AS pending_dcrb_count,
+        SUM(c.pre_Current_Status LIKE '%LIU%')  AS pending_liu_count,
+        SUM(c.pre_Current_Status LIKE '%DCP%')  AS pending_dcp_count,
 
-FROM characters
-
-GROUP BY
-    pre_station,
-    pre_station_code
-
-ORDER BY pre_station`);
+SUM(
+    CASE
+        WHEN c.per_Current_Status IS NOT NULL
+         AND c.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
+        THEN 1
+        ELSE 0
+    END
+) AS own_to_other
+    FROM characters c
+    JOIN user_district ud
+        ON ud.district_id = c.pre_district_id
+    WHERE ud.user_id = ?
+    GROUP BY
+        c.pre_station,
+        c.pre_station_code
+) p
+LEFT JOIN
+(
+    SELECT
+        c.per_station_code,
+        COUNT(*) AS other_to_own
+    FROM characters c
+    JOIN user_district ud
+        ON ud.district_id = c.per_district_id
+    WHERE ud.user_id = ?
+      AND c.pre_station_code <> c.per_station_code
+    GROUP BY
+        c.per_station_code
+) o
+ON p.pre_station_code = o.per_station_code
+ORDER BY
+    p.pre_station;`,[userid,userid]);
 
     const agingSummary = await fetchAgingSummary(sdate, edate);
 
@@ -58,38 +152,138 @@ ORDER BY pre_station`);
 };
 
 
-const characterList = async (req, res, next) => {
+// login ps name and  ps code
+let login = async (req, res) => {
+  console.log("Your are in login.............................");
+  // console.log(req.body);
+
+  const { username, pass } = req.body;
+  let connection;
+  let usertype = "";
   try {
-    const { loc, type } = req.query;
-    if (!loc || !type) {
-      return res.status(400).json({ error: 'loc and type parameters are required' });
+    connection = await pool.getConnection();
+
+    // Use promise-based query without callback
+    const [rows] = await connection.query(
+      "SELECT * FROM users WHERE username = ?",
+      [username],
+    );
+
+    if (rows.length === 0) {
+      return res.json({ success: false, message: "User not found" });
     }
 
-    let query = '';
-    let params = [];
+    let user = rows[0];
 
-    if (loc === 'totaldcp') {
-      query = `SELECT * FROM characters WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP','DCP') ORDER BY pre_station, request_date`;
-    } else if (loc === 'totalliu') {
-      query = `SELECT * FROM characters WHERE pre_Current_Status IN ( 'PS/DCRB/LIU/DCP') ORDER BY pre_station, request_date`;
-    } else if (loc === 'totalps') {
-      query = `SELECT * FROM characters WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP') ORDER BY pre_station, request_date`;
-    } else if (loc === 'totaldcrb') {
-       query = `SELECT * FROM characters WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP') ORDER BY pre_station, request_date`;
-    } else if (loc === 'totalremain') {
-        query = `SELECT * FROM characters WHERE pre_Current_Status NOT IN ('APPROVED','REJECTED') ORDER BY pre_station, request_date`;  
-    } else if (loc === 'totaldiff') {
-      query = `SELECT * FROM characters WHERE pre_station_code <> per_station_code ORDER BY pre_station, request_date`;
-    } else {
+    // Use bcrypt.compare with promise or wrap callback into Promise
+    const isMatch = await bcrypt.compare(pass, user.hashpass);
+
+    if (!isMatch) {
+      return res.json({
+        success: false,
+        message: "Wrong username/password combination!",
+      });
     }
 
-    const [rows] = await pool.execute(query, params);
-    console.log(rows);
-    res.json(rows);
-  } catch (err) {
-    next(err);
+    console.log("user.usertype ", user.usertype);
+
+    // Password matched: set session if available, generate token
+    if (req.session) {
+      req.session.user = user;
+    }
+    // console.log(req.session?.user);
+
+    const jwtSecret = process.env.JWT_SECRET || "super_secret_cctns_agra_jwt_key_2026_verif";
+
+    let token = jwt.sign(
+      {
+        userid: user.userid,
+        username: user.username,
+        usertype: user.usertype,
+      },
+      jwtSecret,
+      { expiresIn: "10m" },
+    );
+
+    return res.json({
+      success: true,
+      message: "Login successful",
+      token,
+      user: {
+        id: user.userid, // ensure this matches your DB column name
+        username: user.username,
+        usertype: user.usertype,
+        district_code: user.district_code || null,
+      },
+    });
+  } catch (error) {
+    console.error("Login error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Login failed. Please try again later.",
+    });
+  } finally {
+    if (connection) connection.release();
   }
-};    
+};
+
+// login session
+const loginsession = async (req, res) => {
+  console.log("You are in session login ......................");
+
+  const authHeader = req.headers.authorization;
+  const token = authHeader ? authHeader.split(" ")[1] : null; // Extract token
+
+  if (!token) {
+    return res
+      .status(401)
+      .json({ success: false, message: "Token not provided" });
+  }
+
+  let connection;
+  try {
+    const trimmedToken = token.trim();
+    const jwtSecret = process.env.JWT_SECRET || "super_secret_cctns_agra_jwt_key_2026_verif";
+
+    // Verify token synchronously; throws on invalid token
+    const decoded = jwt.verify(trimmedToken, jwtSecret);
+    console.log("Decoded token:", decoded);
+
+    connection = await pool.getConnection();
+    const [rows] = await connection.execute(
+      `SELECT userid, users.username as username, users.name as name, usertype FROM users  
+  WHERE userid = ? `,
+      [decoded.userid],
+    );
+
+    if (rows.length === 0) {
+      return res
+        .status(404)
+        .json({ success: false, message: "User not found" });
+    }
+    const user = rows[0];
+    //  console.log('user.usertype ',user.usertype)
+    return res.json({ success: true, user });
+  } catch (error) {
+    console.error("Error fetching user details:", error);
+
+    // Handle specific JWT errors if desired
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ success: false, message: "Token expired" });
+    } else if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to retrieve user details" });
+  } finally {
+    if (connection) await connection.release();
+  }
+};
+
+
+
 
 
 
@@ -376,5 +570,7 @@ module.exports = {
   getDetails,
   getRemain,
   uploadFile,
-  characterList
+  characterList,
+  login,
+  loginsession,
 };

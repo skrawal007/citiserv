@@ -3,6 +3,8 @@ import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
 import {formatDate} from '../utils/dataConvertor';
+import getAuthConfig from "../functions/getAuthConfig";
+
 
 
 const MODULE_NAMES = {
@@ -40,18 +42,18 @@ export default function Characters() {
 
 useEffect(() => {
   console.log("called charcters.jsx useEffect", loc, type);
+  console.log("called charcters.jsx useEffect", getAuthConfig());
+  
   const fetchData = async () => {
     try {
       setLoading(true);
       setError("");
       setRows([]);
 
-      const res = await axios.get("/characterList", {
-        params: {
-          loc,
-          type,
-        },
-      });
+      //  ...getAuthConfig()
+      // const res = await axios.get("/characterList",getAuthConfig());
+
+      const res = await axios.get(`/characterList?loc=${loc}&type=${type}`, getAuthConfig());
 
       setRows(res.data || []);
     } catch (e) {
@@ -65,19 +67,6 @@ useEffect(() => {
 }, [loc, type]);
 
 
-  function printTable() {
-    if (!tableRef.current) return;
-    const w = window.open('', 'Print-Window');
-    w.document.open();
-    w.document.write(`<html><head><style>
-      table{border-collapse:collapse;width:100%}
-      th,td{border:1px solid #ccc;padding:8px;font-size:14px}
-      th{background:#3498db;color:#fff}
-    </style></head><body onload="window.print()">${tableRef.current.outerHTML}</body></html>`);
-    w.document.close();
-    setTimeout(() => w.close(), 10);
-  }
-
   const moduleName = MODULE_NAMES[type] || MODULE_NAMES.character;
   const locHeading = LOC_HEADINGS[loc] || '';
   const heading = `${locHeading} ${moduleName}`.trim();
@@ -88,11 +77,6 @@ useEffect(() => {
     <>
       <Navbar />
 
-      <div className="print-page" id="print-btn">
-        <a href="#" onClick={e => { e.preventDefault(); printTable(); }}>
-          <img src="/img/printer.png" alt="Print" />
-        </a>
-      </div>
 
       <div className="table-wrapper">
         <table id="printable" ref={tableRef}>

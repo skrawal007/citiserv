@@ -13,7 +13,13 @@ const app = express();
 app.use(helmet());
 app.use(
   cors({
-    origin: config.CLIENT_ORIGINS,
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, postman) or matching CORS_ORIGIN
+      if (!origin || config.CLIENT_ORIGINS.includes(origin) || config.CLIENT_ORIGINS.includes('*')) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive in dev
+    },
     credentials: true,
   })
 );
@@ -27,8 +33,13 @@ if (config.NODE_ENV !== 'test') {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Direct Routes & API Routes
+// Dynamic Route Extension Mount
+const routeExt = config.ROUTSEXTENSION ? config.ROUTSEXTENSION.replace(/\/$/, '') : '/api/website/enquiry';
+
+app.use(routeExt, characterRoutes);
+app.use(`${routeExt}/`, characterRoutes);
 app.use('/', characterRoutes);
+app.use('/api', characterRoutes);
 app.use('/api/characters', characterRoutes);
 
 // Health Check

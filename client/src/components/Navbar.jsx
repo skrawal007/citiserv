@@ -1,8 +1,12 @@
-import { Link, useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams, useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const { user, logout } = useAuth();
+
   const currentPath = location.pathname;
   const currentType = searchParams.get('type') || '';
   const currentLoc = searchParams.get('loc') || '';
@@ -13,6 +17,11 @@ export default function Navbar() {
   const isEmployeeActive = currentPath === '/characters' && currentType === 'employee';
   const isTenantActive = currentPath === '/characters' && currentType === 'tenant';
   const isDomesticActive = currentPath === '/characters' && currentType === 'domestic';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="nav-wrapper-main">
@@ -30,6 +39,16 @@ export default function Navbar() {
         </div>
 
         <div className="navbar-logo-right">
+          {user && (
+            <div className="navbar-user-section">
+              <span className="user-badge" title="Logged in user">
+                👤 User: <strong>{user.username}</strong>
+              </span>
+              <button onClick={handleLogout} className="logout-btn" title="Log out of system">
+                🚪 Logout
+              </button>
+            </div>
+          )}
           <a href="https://agrapolice.in/" target="_blank" rel="noreferrer">
             <img src="/img/agra-logo.png" alt="AGRA POLICE LOGO" className="glow-logo" />
           </a>

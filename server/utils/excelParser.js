@@ -108,10 +108,13 @@ const processExcelBuffer = async (fileBuffer) => {
   }
   if (headerRowIdx === -1) headerRowIdx = 1;
 
-  const [stationDistrictList] = await pool.execute(`SELECT 
+  const [stationDistrictList] = await pool.execute(`
+          SELECT 
+            district_.id AS district_id,
             district_.code AS district_code,
             district_.name AS district_name,
             district_.hindi_name as district_hindi_name,
+            station_.id AS station_id,
             station_.code AS station_code,
             station_.name AS station_name,
             station_.hindi_name AS station_hindi_name
@@ -125,6 +128,7 @@ const processExcelBuffer = async (fileBuffer) => {
 
     if (!districtMap.has(districtKey)) {
       districtMap.set(districtKey, {
+        district_id: row.district_id,
         district_code: row.district_code,
         district_name: row.district_name,
         district_hindi_name: row.district_hindi_name,
@@ -135,6 +139,7 @@ const processExcelBuffer = async (fileBuffer) => {
     districtMap.get(districtKey).stations.set(
       row.station_hindi_name.trim(),
       {
+        station_id: row.station_id,
         station_code: row.station_code,
         station_name: row.station_name, // English
         station_hindi_name: row.station_hindi_name,
@@ -219,12 +224,13 @@ const processExcelBuffer = async (fileBuffer) => {
 
       pre_Current_Status = getStatusCode(presentAddress);
       per_Current_Status = getStatusCode(permanentAddress);
-      console.log("ACK ", ACK);
-      console.log("Current_Status includes", Current_Status);
-      console.log("presentAddress:", presentAddress);
-      console.log("pre_Current_Status:", pre_Current_Status);
-      console.log("permanentAddress:", permanentAddress);
-      console.log("per_Current_Status:", per_Current_Status);
+
+      // console.log("ACK ", ACK);
+      // console.log("Current_Status includes", Current_Status);
+      // console.log("presentAddress:", presentAddress);
+      // console.log("pre_Current_Status:", pre_Current_Status);
+      // console.log("permanentAddress:", permanentAddress);
+      // console.log("per_Current_Status:", per_Current_Status);
     }
 
     if (!ACK && !PS && !NAME) continue;
@@ -253,22 +259,29 @@ const processExcelBuffer = async (fileBuffer) => {
       request_number: ACK,
       request_date: ACKDATE,
       applicant_name: NAME,
+      
       Current_Status: Current_Status,
       pre_Current_Status: pre_Current_Status,
       per_Current_Status: per_Current_Status,
+      
       present_address: PRE_ADD,
       pre_add: preAddParse.address,
-      pre_station: preAddParse.station_name,
+      pre_station_id: preAddParse.station_id,
       pre_station_code: preAddParse.station_code,
-      pre_district: preAddParse.district_name,
+      pre_station_name: preAddParse.station_name,
+      pre_district_id: preAddParse.district_id,
       pre_district_code: preAddParse.district_code,
+      pre_district_name: preAddParse.district_name,
 
       permanent_address: PER_ADD,
       per_add: perAddParse.address,
-      per_station: perAddParse.station_name,
+      per_station_id: perAddParse.station_id,
       per_station_code: perAddParse.station_code,
-      per_district_name: perAddParse.district_name,
+      per_station_name: perAddParse.station_name,
+      per_district_id: perAddParse.district_id,
       per_district_code: perAddParse.district_code,
+      per_district_name: perAddParse.district_name,
+    
     });
 
     if (perAddParse.station_code === preAddParse.station_code) {
@@ -278,7 +291,7 @@ const processExcelBuffer = async (fileBuffer) => {
     } 
   }
 
-  // console.log(jsonResult);
+  console.log(jsonResult);
   console.log("jsonResult.length ", jsonResult.length);
   console.log("addressCounts ", addressCounts);
   console.log("differentAddressCount ", differentAddressCount);
@@ -301,26 +314,37 @@ const saveCharacters = async (data) => {
 
   if (!data.length) return;
 
+
+
   const sql = `
         INSERT INTO characters (
+            service,
             request_number,
             request_date,
             applicant_name,
-            pre_Current_Status,
-            per_Current_Status,
+            
             present_address,
             pre_add,
-            pre_station,
+            pre_station_id, 
             pre_station_code,
-            pre_district,
+            pre_station,
+            pre_district_id,
             pre_district_code,
-            permanent_address,
+            pre_district,
+        
+            permanent_address, 
             per_add,
-            per_station,
+            per_station_id,
             per_station_code,
+            per_station,
+            per_district_id,
+            per_district_code,
             per_district_name,
-            per_district_code
-        )
+            pre_Current_Status,
+            per_Current_Status
+         
+        
+            )
         VALUES ?
         ON DUPLICATE KEY UPDATE
             pre_Current_Status = VALUES(pre_Current_Status),
@@ -328,25 +352,33 @@ const saveCharacters = async (data) => {
             updated_at = CURRENT_TIMESTAMP
     `;
 
-  const values = data.map(item => [
-    item.request_number,
-    item.request_date,
-    item.applicant_name,
-    item.pre_Current_Status,
-    item.per_Current_Status,
-    item.present_address,
-    item.pre_add,
-    item.pre_station,
-    item.pre_station_code,
-    item.pre_district,
-    item.pre_district_code,
-    item.permanent_address,
-    item.per_add,
-    item.per_station,
-    item.per_station_code,
-    item.per_district_name,
-    item.per_district_code
-  ]);
+const values = data.map(item => [
+  item.service,
+  item.request_number,
+  item.request_date,
+  item.applicant_name,
+
+  item.present_address,
+  item.pre_add,
+  item.pre_station_id,
+  item.pre_station_code,
+  item.pre_station_name,
+  item.pre_district_id,
+  item.pre_district_code,
+  item.pre_district_name,
+
+  item.permanent_address,
+  item.per_add,
+  item.per_station_id,
+  item.per_station_code,
+  item.per_station_name,
+  item.per_district_id,
+  item.per_district_code,
+  item.per_district_name,
+
+  item.pre_Current_Status,
+  item.per_Current_Status
+]);
 
   await pool.query(sql, [values]);
 }
