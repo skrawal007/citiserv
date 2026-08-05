@@ -53,7 +53,7 @@ const characterList = async (req, res,next) => {
     } else if(loc ==='OTHER_TO_OWN_PS'){
             query = `SELECT * FROM characters
                 JOIN user_district ON user_district.district_id = characters.per_district_id
-                WHERE pre_station_id<>per_station_id ${lastCondition}`;      
+                WHERE per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_id<>per_station_id ${lastCondition}`;      
     }
 
     const [rows] = await pool.execute(query, [userid]);
@@ -132,6 +132,7 @@ LEFT JOIN
     JOIN user_district ud
         ON ud.district_id = c.per_district_id
     WHERE ud.user_id = ?
+        AND c.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
       AND c.pre_station_code <> c.per_station_code
     GROUP BY
         c.per_station_code
