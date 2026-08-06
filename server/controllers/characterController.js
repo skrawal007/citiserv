@@ -12,57 +12,63 @@ const {
 
 
 
-const characterList = async (req, res,next) => {
+const LIST_TABLES = new Set(['characters', 'employees', 'tenants', 'domestic']);
 
-  console.log('Character list request received with query:', req.query);
-    console.log("TOKEN USER DATA:", req.user);
-
+/**
+ * Returns records for one verification module.  The table name is supplied only
+ * by a route-created handler, never from a request parameter.
+ */
+const verificationList = async (req, res, next, table) => {
   try {
-    const{userid, username, usertype} = req.user;
-    const { loc, type } = req.query;
-    if (!loc || !type) {
-      return res.status(400).json({ error: 'loc and type parameters are required' });
+    const { loc } = req.query;
+    if (!loc) {
+      return res.status(400).json({ error: 'loc parameter is required' });
     }
-    let query = '';
-
-    let firstCondition = `SELECT * FROM characters
-                          JOIN user_district ON user_district.district_id = characters.pre_district_id `
-
-    let lastCondition = `AND user_district.user_id = ? 
-                        ORDER BY pre_station, request_date`;
-    if (loc === 'totaldcp') {
-      query = `${firstCondition}
-                WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP','DCP') 
-                ${lastCondition}`;
-    } else if (loc === 'totalliu') {
-      query = `${firstCondition}
-            WHERE pre_Current_Status IN ( 'PS/DCRB/LIU/DCP') 
-            ${lastCondition}`;
-    } else if (loc === 'totalps') {
-      query = `${firstCondition}
-      WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP') ${lastCondition}`;
-    } else if (loc === 'totaldcrb') {
-       query = `${firstCondition}
-       WHERE pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP') ${lastCondition}`;
-    } else if (loc === 'totalremain') {
-        query = `${firstCondition}
-        WHERE pre_Current_Status NOT IN ('APPROVED','REJECTED') ${lastCondition}  `;  
-    } else if (loc === 'totaldiff') {
-      query = `${firstCondition}
-      WHERE pre_station_code <> per_station_code ${lastCondition}`;
-    } else if(loc ==='OTHER_TO_OWN_PS'){
-            query = `SELECT * FROM characters
-                JOIN user_district ON user_district.district_id = characters.per_district_id
-                WHERE per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_id<>per_station_id ${lastCondition}`;      
+    if (!LIST_TABLES.has(table)) {
+      return res.status(500).json({ error: 'Invalid verification list configuration' });
     }
 
-    const [rows] = await pool.execute(query, [userid]);
-    // console.log(rows);
-    res.json(rows);
+    const conditions = {
+      totaldcp: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP', 'DCP')",
+      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
+      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
+      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
+      totaldiff: 'pre_station_code <> per_station_code',
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+
+    const condition = conditions[loc];
+    if (!condition) {
+      return res.status(400).json({ error: 'Invalid list location' });
+    }
+
+    // Character records retain the existing district access restriction.  The
+    // other upload tables contain district codes (rather than district IDs), so
+    // they are queried through their own module endpoints without that join.
+    const characterUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS';
+    const query = table === 'characters'
+      ? `SELECT c.* FROM \`characters\` c
+           JOIN user_district ud ON ud.district_id = c.${characterUsesPermanentDistrict ? 'per_district_id' : 'pre_district_id'}
+           WHERE ${condition} AND ud.user_id = ?
+           ORDER BY c.pre_station, c.request_date`
+      : `SELECT * FROM \`${table}\` WHERE ${condition} ORDER BY pre_station, request_date`;
+    const params = table === 'characters' ? [req.user.userid] : [];
+    const [rows] = await pool.execute(query, params);
+    return res.json(rows);
   } catch (err) {
-    console.error("Error fetching character list:", err);
+    console.error(`Error fetching ${table} list:`, err);
+    return next(err);
   }
-};    
+};
+
+const createVerificationListHandler = (table) => (req, res, next) =>
+  verificationList(req, res, next, table);
+
+const characterList = createVerificationListHandler('characters');
+const employeeList = createVerificationListHandler('employees');
+const tenantList = createVerificationListHandler('tenants');
+const domesticList = createVerificationListHandler('domestic');
 
 
 
@@ -572,6 +578,9 @@ module.exports = {
   getRemain,
   uploadFile,
   characterList,
+  employeeList,
+  tenantList,
+  domesticList,
   login,
   loginsession,
 };

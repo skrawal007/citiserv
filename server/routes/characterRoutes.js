@@ -12,6 +12,9 @@ const {
   getRemain,
   uploadFile,
   characterList,
+  employeeList,
+  tenantList,
+  domesticList,
   login,  
   loginsession
 } = require('../controllers/characterController');
@@ -26,6 +29,9 @@ router.get('/dashboard', authMiddleware,Dashboard);
 router.post('/dashboard', authMiddleware,getDashboardByDate);
 router.get('/pending', authMiddleware, getPending);
 router.get('/characterList', authMiddleware, characterList);
+router.get('/employeeList', authMiddleware, employeeList);
+router.get('/tenantList', authMiddleware, tenantList);
+router.get('/domesticList', authMiddleware, domesticList);
 router.get('/details', getDetails);
 router.get('/remain', getRemain);
 router.post('/upload', upload.single('excel_file'), uploadFile);

@@ -25,6 +25,13 @@ const LOC_HEADINGS = {
   totaldiff:    'अन्य थानों से सम्बन्धित लम्बित',
 };
 
+const LIST_ENDPOINTS = {
+  character: '/characterList',
+  employee: '/employeeList',
+  tenant: '/tenantList',
+  domestic: '/domesticList',
+};
+
  
 const hideStatus = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
 const hidePraAdd = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
@@ -41,19 +48,20 @@ export default function Characters() {
   const tableRef = useRef(null);
 
 useEffect(() => {
-  console.log("called charcters.jsx useEffect", loc, type);
-  console.log("called charcters.jsx useEffect", getAuthConfig());
-  
   const fetchData = async () => {
     try {
       setLoading(true);
       setError("");
       setRows([]);
 
-      //  ...getAuthConfig()
-      // const res = await axios.get("/characterList",getAuthConfig());
-
-      const res = await axios.get(`/characterList?loc=${loc}&type=${type}`, getAuthConfig());
+      const endpoint = LIST_ENDPOINTS[type];
+      if (!endpoint) {
+        throw new Error('Unsupported verification type');
+      }
+      const res = await axios.get(endpoint, {
+        params: { loc },
+        ...getAuthConfig(),
+      });
 
       setRows(res.data || []);
     } catch (e) {
@@ -123,4 +131,3 @@ useEffect(() => {
     </>
   );
 }
-
