@@ -118,6 +118,12 @@ export default function Navbar() {
               <li className={isEmployeeActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=totaldcp">DCP (डीसीपी)</Link>
               </li>
+              <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+                <Link to="/characters?type=employee&loc=totaldiff">Own PS → Other PS</Link>
+              </li>
+               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+                <Link to="/characters?type=employee&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
+              </li>
             </ul>
           </li>
 
@@ -135,6 +141,12 @@ export default function Navbar() {
               </li>
               <li className={isTenantActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=totaldcp">DCP (डीसीपी)</Link>
+              </li>
+                <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+                <Link to="/characters?type=tenant&loc=totaldiff">Own PS → Other PS</Link>
+              </li>
+               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+                <Link to="/characters?type=tenant&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
               </li>
             </ul>
           </li>
@@ -154,6 +166,13 @@ export default function Navbar() {
               <li className={isDomesticActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&loc=totaldcp">DCP (डीसीपी)</Link>
               </li>
+              <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+                <Link to="/characters?type=domestic&&loc=totaldiff">Own PS → Other PS</Link>
+              </li>
+               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+                <Link to="/characters?type=domestic&&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
+              </li>
+              
             </ul>
           </li>
 
@@ -162,18 +181,6 @@ export default function Navbar() {
             <ul>
               <li className={isUploadActive && currentType === 'character' ? 'active-sub' : ''}>
                 <Link to="/upload?type=character">🛡️ Character</Link>
-              </li>
-              <li className={isUploadActive && currentType === 'employee' ? 'active-sub' : ''}>
-                <Link to="/upload?type=employee">💼 Employee</Link>
-              </li>
-              <li className={isUploadActive && currentType === 'tenant' ? 'active-sub' : ''}>
-                <Link to="/upload?type=tenant">🏠 Tenant</Link>
-              </li>
-              <li className={isUploadActive && currentType === 'domestic' ? 'active-sub' : ''}>
-                <Link to="/upload?type=domestic">🧹 Domestic</Link>
-              </li>
-              <li className={isUploadActive && currentType === 'complaints' ? 'active-sub' : ''}>
-                <Link to="/upload?type=complaints">📢 Complaints</Link>
               </li>
             </ul>
           </li>

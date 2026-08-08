@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { pool } = require('../database/db');
 const { processExcelBuffer } = require('../utils/excelParser');
+const mysql =require('mysql2/promise');
 const {
   PS_STATUSES,
   LIU_STATUSES,
@@ -12,20 +13,156 @@ const {
 
 
 
-const LIST_TABLES = new Set(['characters', 'employees', 'tenants', 'domestic']);
-
-/**
- * Returns records for one verification module.  The table name is supplied only
- * by a route-created handler, never from a request parameter.
- */
-const verificationList = async (req, res, next, table) => {
+const characterList = async (req, res, next) => {
   try {
     const { loc } = req.query;
+    const {userid} =req.user;
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
-    if (!LIST_TABLES.has(table)) {
-      return res.status(500).json({ error: 'Invalid verification list configuration' });
+
+    const conditions = {
+      totaldcp: "pre_Current_Status IN ('DCP')",
+      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
+      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
+      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
+      totaldiff: 'pre_station_code <> per_station_code',
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+    const condition = conditions[loc];
+    if (!condition) {
+      return res.status(400).json({ error: 'Invalid list location' });
+    }
+
+    const characterUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
+    const stationColumn = characterUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+    const query =` SELECT characters.* FROM characters 
+      JOIN station_ ON station_.code = characters.${stationColumn}
+      JOIN user_station ON user_station.station_id = station_.id
+      JOIN district_ ON district_.code = station_.district_code
+      JOIN user_district ON user_district.district_id= district_.id
+      WHERE  ${condition} 
+      AND user_district.user_id = ?
+      ORDER BY pre_station, request_date;`;
+
+    console.log(mysql.format(query,[req.user.userid]));
+
+      const [rows] = await pool.execute(query, [userid]);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('Error fetching character list:', err);
+    return next(err);
+  }
+};
+
+const employeeList = async (req, res, next) => {
+  try {
+    const { loc } = req.query;
+    const {userid} =req.user;
+
+    if (!loc) {
+      return res.status(400).json({ error: 'loc parameter is required' });
+    }
+
+    const conditions = {
+      totaldcp: "pre_Current_Status IN ('DCP')",
+      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
+      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
+      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
+      totaldiff: 'pre_station_code <> per_station_code',
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+    const condition = conditions[loc];
+    if (!condition) {
+      return res.status(400).json({ error: 'Invalid list location' });
+    }
+  
+    const employeeUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
+
+    const stationColumn = employeeUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+
+    // const query = `SELECT * FROM employees WHERE ${condition} ORDER BY pre_station, request_date`;
+
+    const query =` 
+      SELECT employees.* FROM employees 
+      JOIN station_ ON station_.code = ${stationColumn}
+      JOIN district_ ON district_.code = station_.district_code
+      JOIN user_district ON user_district.district_id= district_.id
+      WHERE  ${condition} 
+	      AND user_district.user_id = 10074
+      ORDER BY pre_station, request_date;`;
+        
+   console.log(mysql.format(query));
+
+    const [rows] = await pool.execute(query,[userid]);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('Error fetching employee list:', err);
+    return next(err);
+  }
+};
+
+const tenantList = async (req, res, next) => {
+  try {
+    const { loc } = req.query;
+    const {userid} =req.user;
+
+    if (!loc) {
+      return res.status(400).json({ error: 'loc parameter is required' });
+    }
+
+    const conditions = {
+      totaldcp: "pre_Current_Status IN ('DCP')",
+      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
+      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
+      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
+      totaldiff: 'pre_station_code <> per_station_code',
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+    const condition = conditions[loc];
+    if (!condition) {
+      return res.status(400).json({ error: 'Invalid list location' });
+    }
+  
+    const tenantsUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
+
+    const stationColumn = tenantsUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+
+   
+    const query =` 
+      SELECT tenants.* FROM tenants 
+      JOIN station_ ON station_.code = ${stationColumn}
+      JOIN district_ ON district_.code = station_.district_code
+      JOIN user_district ON user_district.district_id= district_.id
+      WHERE  ${condition} 
+	      AND user_district.user_id = ?
+      ORDER BY pre_station, request_date;`;
+        
+   console.log(mysql.format(query));
+
+    const [rows] = await pool.execute(query,[userid]);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('Error fetching tenant list:', err);
+    return next(err);
+  }
+};
+
+const domesticList = async (req, res, next) => {
+  try {
+    const { loc } = req.query;
+    const {userid} =req.user;
+    if (!loc) {
+      return res.status(400).json({ error: 'loc parameter is required' });
     }
 
     const conditions = {
@@ -33,44 +170,39 @@ const verificationList = async (req, res, next, table) => {
       totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
       totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
       totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
       totaldiff: 'pre_station_code <> per_station_code',
       OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
     };
-
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
+  
+    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
 
-    // Character records retain the existing district access restriction.  The
-    // other upload tables contain district codes (rather than district IDs), so
-    // they are queried through their own module endpoints without that join.
-    const characterUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS';
-    const query = table === 'characters'
-      ? `SELECT c.* FROM \`characters\` c
-           JOIN user_district ud ON ud.district_id = c.${characterUsesPermanentDistrict ? 'per_district_id' : 'pre_district_id'}
-           WHERE ${condition} AND ud.user_id = ?
-           ORDER BY c.pre_station, c.request_date`
-      : `SELECT * FROM \`${table}\` WHERE ${condition} ORDER BY pre_station, request_date`;
-    const params = table === 'characters' ? [req.user.userid] : [];
-    const [rows] = await pool.execute(query, params);
+    const stationColumn = domesticUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+
+    const query =` 
+      SELECT domestic.* FROM domestic 
+      JOIN station_ ON station_.code = ${stationColumn}
+      JOIN district_ ON district_.code = station_.district_code
+      JOIN user_district ON user_district.district_id= district_.id
+      WHERE  ${condition} 
+	      AND user_district.user_id = ?
+      ORDER BY pre_station, request_date;`;
+        
+   console.log(mysql.format(query));
+
+    const [rows] = await pool.execute(query,[userid]);
+
     return res.json(rows);
   } catch (err) {
-    console.error(`Error fetching ${table} list:`, err);
+    console.error('Error fetching domestic list:', err);
     return next(err);
   }
 };
-
-const createVerificationListHandler = (table) => (req, res, next) =>
-  verificationList(req, res, next, table);
-
-const characterList = createVerificationListHandler('characters');
-const employeeList = createVerificationListHandler('employees');
-const tenantList = createVerificationListHandler('tenants');
-const domesticList = createVerificationListHandler('domestic');
-
-
 
 
 const Dashboard = async (req, res, next) => {
@@ -79,9 +211,18 @@ const Dashboard = async (req, res, next) => {
   try {
     const { type, sdate, edate } = req.query;
     const { userid, username, usertype } = req.user;
+    let tableType ;
+    if(type ==='employee'){
+      tableType ='employees'
+    }else if(type ==='character'){
+      tableType = 'characters'
+    } else if( type === 'tenant'){
+      tableType = 'tenants';
+    } else if (type === 'domestic'){
+      tableType ='domestic'
+    } 
     
-    const [stationRows] = await pool.execute(`
-SELECT
+   let query =`SELECT
     p.pre_station,
     p.pre_station_code,
     p.request_count,
@@ -97,55 +238,52 @@ SELECT
 FROM
 (
     SELECT
-        c.pre_station,
-        c.pre_station_code,
+        pre_station,
+        pre_station_code,
         COUNT(*) AS request_count,
 
-        SUM(c.pre_Current_Status LIKE '%APPROVED%') AS approved_count,
-        SUM(c.pre_Current_Status LIKE '%REJECTED%') AS rejected_count,
+        SUM(pre_Current_Status LIKE '%APPROVED%') AS approved_count,
+        SUM(pre_Current_Status LIKE '%REJECTED%') AS rejected_count,
 
         COUNT(*)
-        - SUM(c.pre_Current_Status LIKE '%APPROVED%')
-        - SUM(c.pre_Current_Status LIKE '%REJECTED%') AS pending_count,
+        - SUM(pre_Current_Status LIKE '%APPROVED%')
+        - SUM(pre_Current_Status LIKE '%REJECTED%') AS pending_count,
 
-        SUM(c.pre_Current_Status LIKE '%PS%')   AS pending_ps_count,
-        SUM(c.pre_Current_Status LIKE '%DCRB%') AS pending_dcrb_count,
-        SUM(c.pre_Current_Status LIKE '%LIU%')  AS pending_liu_count,
-        SUM(c.pre_Current_Status LIKE '%DCP%')  AS pending_dcp_count,
+        SUM(pre_Current_Status LIKE '%PS%')   AS pending_ps_count,
+        SUM(pre_Current_Status LIKE '%DCRB%') AS pending_dcrb_count,
+        SUM(pre_Current_Status LIKE '%LIU%')  AS pending_liu_count,
+        SUM(pre_Current_Status LIKE '%DCP%')  AS pending_dcp_count,
 
 SUM(
     CASE
-        WHEN c.per_Current_Status IS NOT NULL
-         AND c.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
+        WHEN per_Current_Status IS NOT NULL
+         AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')
         THEN 1
         ELSE 0
     END
 ) AS own_to_other
-    FROM characters c
-    JOIN user_district ud
-        ON ud.district_id = c.pre_district_id
+    FROM ${tableType} 
+    JOIN station_ ON station_.code = ${tableType}.pre_station_code
+    JOIN district_ ON district_.code = station_.district_code
+    JOIN user_district ud ON ud.district_id = district_.id
     WHERE ud.user_id = ?
-    GROUP BY
-        c.pre_station,
-        c.pre_station_code
+    GROUP BY pre_station,pre_station_code
 ) p
 LEFT JOIN
 (
     SELECT
-        c.per_station_code,
+        per_station_code,
         COUNT(*) AS other_to_own
-    FROM characters c
-    JOIN user_district ud
-        ON ud.district_id = c.per_district_id
-    WHERE ud.user_id = ?
-        AND c.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
-      AND c.pre_station_code <> c.per_station_code
-    GROUP BY
-        c.per_station_code
-) o
-ON p.pre_station_code = o.per_station_code
-ORDER BY
-    p.pre_station;`,[userid,userid]);
+    FROM ${tableType} 
+	JOIN station_ ON station_.code = ${tableType}.pre_station_code
+    JOIN district_ ON district_.code = station_.district_code
+    JOIN user_district ud ON ud.district_id = district_.id
+    WHERE ud.user_id = ? AND per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code
+    GROUP BY per_station_code
+) o ON p.pre_station_code = o.per_station_code
+ORDER BY p.pre_station`;
+
+    const [stationRows] = await pool.execute(query,[userid,userid]);
 
     const agingSummary = await fetchAgingSummary(sdate, edate);
 
@@ -158,6 +296,134 @@ ORDER BY
   }
 };
 
+const combinedDashbaord = async (req, res, next) => {
+  console.log('Dashboard request received with query:', req.query);
+  console.log("TOKEN USER DATA:", req.user);
+  try{
+
+    const { type, sdate, edate } = req.query;
+    const { userid, username, usertype } = req.user;
+
+    console.log( typeof userid);
+   let  query=`WITH verification_records AS (
+    SELECT 'Tenants' AS verification_type,
+           pre_district_code,
+           per_district_code,
+           pre_Current_Status,
+           per_Current_Status
+    FROM tenants
+
+    UNION ALL
+
+    SELECT 'Employee' AS verification_type,
+           pre_district_code,
+           per_district_code,
+           pre_Current_Status,
+           per_Current_Status
+    FROM employees
+
+    UNION ALL
+
+    SELECT 'Character' AS verification_type,
+           pre_district_code,
+           per_district_code,
+           pre_Current_Status,
+           per_Current_Status
+    FROM characters
+
+    UNION ALL
+
+    SELECT 'Domestic' AS verification_type,
+           pre_district_code,
+           per_district_code,
+           pre_Current_Status,
+           per_Current_Status
+    FROM domestic
+),
+outgoing AS (
+    SELECT
+        vr.verification_type,
+        vr.pre_district_code AS district_code,
+        COUNT(*) AS request_count,
+
+        SUM(CASE WHEN vr.pre_Current_Status LIKE '%APPROVED%' THEN 1 ELSE 0 END) AS approved_count,
+        SUM(CASE WHEN vr.pre_Current_Status LIKE '%REJECTED%' THEN 1 ELSE 0 END) AS rejected_count,
+
+        SUM(CASE
+            WHEN vr.pre_Current_Status IS NULL
+              OR (
+                vr.pre_Current_Status NOT LIKE '%APPROVED%'
+                AND vr.pre_Current_Status NOT LIKE '%REJECTED%'
+              )
+            THEN 1 ELSE 0
+        END) AS pending_count,
+
+        SUM(CASE WHEN vr.pre_Current_Status LIKE '%PS%' THEN 1 ELSE 0 END) AS pending_ps_count,
+        SUM(CASE WHEN vr.pre_Current_Status LIKE '%DCRB%' THEN 1 ELSE 0 END) AS pending_dcrb_count,
+        SUM(CASE WHEN vr.pre_Current_Status LIKE '%LIU%' THEN 1 ELSE 0 END) AS pending_liu_count,
+        SUM(CASE WHEN vr.pre_Current_Status LIKE '%DCP%' THEN 1 ELSE 0 END) AS pending_dcp_count,
+
+        SUM(CASE
+            WHEN vr.per_Current_Status IS NOT NULL
+             AND vr.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
+             AND vr.pre_district_code <> vr.per_district_code
+            THEN 1 ELSE 0
+        END) AS own_to_other
+    FROM verification_records vr
+    JOIN district_ d ON d.code = vr.pre_district_code
+    JOIN user_district ud ON ud.district_id = d.id
+    WHERE ud.user_id = ?
+    GROUP BY vr.verification_type, vr.pre_district_code
+),
+incoming AS (
+    SELECT
+        vr.verification_type,
+        vr.per_district_code,
+        COUNT(*) AS other_to_own
+    FROM verification_records vr
+    JOIN district_ d ON d.code = vr.per_district_code
+    JOIN user_district ud ON ud.district_id = d.id
+    WHERE ud.user_id = ?
+      AND vr.per_Current_Status IS NOT NULL
+      AND vr.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
+      AND vr.pre_district_code <> vr.per_district_code
+    GROUP BY vr.verification_type, vr.per_district_code
+)
+SELECT
+    o.verification_type,
+    o.district_code,
+    o.request_count,
+    o.approved_count,
+    o.rejected_count,
+    o.pending_count,
+    o.pending_ps_count,
+    o.pending_dcrb_count,
+    o.pending_liu_count,
+    o.pending_dcp_count,
+    o.own_to_other,
+    COALESCE(i.other_to_own, 0) AS other_to_own
+FROM outgoing o
+LEFT JOIN incoming i
+    ON i.verification_type = o.verification_type
+   AND i.per_district_code = o.district_code
+ORDER BY o.verification_type, o.district_code;`;
+
+    const [result] = await pool.execute(query,[userid,userid]);
+    console.log( "result length ; ",result.length);
+
+    // console.log(mysql.format(query,[userid,userid]));
+
+
+    res.json({
+        DashboardResult : result
+      })
+
+  }
+   catch (err) {
+    next(err);
+  }
+
+}
 
 // login ps name and  ps code
 let login = async (req, res) => {
@@ -295,14 +561,6 @@ const loginsession = async (req, res) => {
 
 
 
-
-
-
-
-
-
-
-
 // Dynamic helper to resolve ps source
 const getPsSource = async () => {
   try {
@@ -315,12 +573,12 @@ const getPsSource = async () => {
 
 // Database Query Helpers
 const fetchMinDate = async () => {
-  const [rows] = await pool.execute('SELECT MIN(अनुरोध_दिनांक) as minDate FROM characters');
+  // const [rows] = await pool.execute('SELECT MIN(अनुरोध_दिनांक) as minDate FROM characters');
   return rows[0]?.minDate || null;
 };
 
 const fetchMaxDate = async () => {
-  const [rows] = await pool.execute('SELECT MAX(अनुरोध_दिनांक) as maxDate FROM characters');
+  // const [rows] = await pool.execute('SELECT MAX(अनुरोध_दिनांक) as maxDate FROM characters');
   return rows[0]?.maxDate || null;
 };
 
@@ -572,6 +830,7 @@ module.exports = {
   getMinDate,
   getMaxDate,
   Dashboard,
+  combinedDashbaord,
   getDashboardByDate,
   getPending,
   getDetails,

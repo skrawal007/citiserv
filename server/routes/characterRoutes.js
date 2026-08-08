@@ -6,6 +6,7 @@ const {
   getMinDate,
   getMaxDate,
   Dashboard,
+  combinedDashbaord,
   getDashboardByDate,
   getPending,
   getDetails,
@@ -26,6 +27,7 @@ const router = express.Router();
 router.get('/mindate', getMinDate);
 router.get('/maxdate', getMaxDate);
 router.get('/dashboard', authMiddleware,Dashboard);
+router.get('/combinedDashbaord', authMiddleware, combinedDashbaord);
 router.post('/dashboard', authMiddleware,getDashboardByDate);
 router.get('/pending', authMiddleware, getPending);
 router.get('/characterList', authMiddleware, characterList);

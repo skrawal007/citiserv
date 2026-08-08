@@ -23,29 +23,38 @@ const processExcelBuffer = async (fileBuffer) => {
     defval: "",
   });
 
+
+   const serviceTypeHeader = String(rows[1]?.[3] || "").trim();
+  const serviceTypeValue = String(rows[2]?.[3] || "").trim();
+
+  console.log("D2:", serviceTypeHeader);
+  console.log("D3:", serviceTypeValue);
+
   const reportTitle = String(rows[0]?.[0] || "").trim();
+
+
 
   console.log("Report Title:", reportTitle);
 
-  if (reportTitle.includes("चरित्र प्रमाणपत्र")) { 
+  if (reportTitle.includes("चरित्र प्रमाणपत्र") ||(  serviceTypeHeader === "Service Type" && serviceTypeValue.includes("चरित्र सत्यापन"))) { 
     const processCharacterVerificationData = await processCharacterVerification(rows, workbook);
     const insertedResult = await charactersDatabase(processCharacterVerificationData.jsonResult);
      return processCharacterVerificationData;
   }
 
-  if (reportTitle.includes("कर्मचारी सत्यापन")) {
+  if (reportTitle.includes("कर्मचारी सत्यापन") ||(  serviceTypeHeader === "Service Type" && serviceTypeValue.includes("कर्मचारी सत्यापन"))) {
     const processEmployeeVerificationData= await processEmployeeVerification(rows, workbook);
     const insertEmployeeResult= await emplooyeesDatabase(processEmployeeVerificationData.jsonResult);
     return processEmployeeVerificationData;
   }
 
-  if (reportTitle.includes("किरायेदार")) {
+  if (reportTitle.includes("किरायेदार") ||(  serviceTypeHeader === "Service Type" && serviceTypeValue.includes("किरायेदारी"))) {
     const processTenantVerificationData= await processTenantVerification(rows, workbook);
     const insertTenantResult= await tenantDatabase(processTenantVerificationData.jsonResult);
     return processTenantVerificationData;
   
   }
-  if (reportTitle.includes("घरेलू")) {
+  if (reportTitle.includes("घरेलू") ||(  serviceTypeHeader === "Service Type" && serviceTypeValue.includes("घरेलू"))) {
     const processDomesticVerificationData= await processDomesticVerification(rows, workbook);
     const insertDomesticResult= await domesticDatabase(processDomesticVerificationData.jsonResult);
     return processDomesticVerificationData;
@@ -1010,12 +1019,12 @@ const processTenantVerification = async (rows, workbook) => {
       pre_Current_Status = getStatusCode(presentAddress);
       per_Current_Status = getStatusCode(permanentAddress);
 
-      // console.log("ACK ", ACK);
-      // console.log("Current_Status includes", Current_Status);
-      // console.log("presentAddress:", presentAddress);
-      // console.log("pre_Current_Status:", pre_Current_Status);
-      // console.log("permanentAddress:", permanentAddress);
-      // console.log("per_Current_Status:", per_Current_Status);
+      console.log("ACK ", ACK);
+      console.log("Current_Status includes", Current_Status);
+      console.log("presentAddress:", presentAddress);
+      console.log("pre_Current_Status:", pre_Current_Status);
+      console.log("permanentAddress:", permanentAddress);
+      console.log("per_Current_Status:", per_Current_Status);
     }
 
     if (!ACK && !PS && !NAME) continue;
@@ -1071,7 +1080,7 @@ const processTenantVerification = async (rows, workbook) => {
       differentAddressCount++;
     } 
   }
-  console.log(jsonResult);
+  // console.log(jsonResult);
 
   console.log("jsonResult.length ", jsonResult.length);
   console.log("addressCounts ", addressCounts);
@@ -1536,6 +1545,7 @@ function getStatusCode(statusText) {
   const STATUS_MAP = {
     
 '(पूछताछअधिकारीनिरुपित/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCP',
+'(पूछताछअधिकारीद्वाराप्रस्तुतसत्यापनरिपोर्ट/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही':'PS/DCP',
 '(पूछताछअधिकारीनिरुपित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/LIU/DCP',
 '(पूछताछअधिकारीसमनुदेशनकेलिएलंबित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/जमाकरनेकेलिएलंबितएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/LIU/DCP',
 '(पूछताछअधिकारीनिरुपित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/जमाकरनेकेलिएलंबितएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही': 'PS/DCRB/LIU/DCP',
@@ -1552,6 +1562,9 @@ function getStatusCode(statusText) {
 '(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)':'APPROVED',
 '(पूछताछअधिकारीनिरुपित/अस्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)-औरएस.पी./एस.एस.पी.सेलंबितकार्यवाही':'PS/DCP',
 '(पूछताछअधिकारीनिरुपित/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)':'PS',
+'(पूछताछअधिकारीद्वाराप्रस्तुतसत्यापनरिपोर्ट/स्वीकृतडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)': "PS",
+'(पुलिसस्टेशनद्वारासत्यापनपूर्णकियागया/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)': "DCRB",
+'(पूछताछअधिकारीनिरुपित/जमाकरनेकेलिएलंबितडीसीआरबीद्वारा/स्वीकृतएलआईयूद्वारा)':"PS/DCRB",
 'स्वीकृत': 'APPROVED',
 'अस्वीकृत': 'REJECTED',
 };
@@ -1560,12 +1573,12 @@ function getStatusCode(statusText) {
 
 function getSepareteStatus(text) {
     const parts = text.split("-");
-// console.log("parts length  ", parts.length);
-// console.log("part[1]", parts[1]);
-// console.log("part[2]", parts[2]);
-// console.log("part[3]", parts[3]);
-// console.log("part[4]", parts[4]);
-// console.log("part[5]", parts[5]);
+console.log("parts length  ", parts.length);
+console.log("part[1]", parts[1]);
+console.log("part[2]", parts[2]);
+console.log("part[3]", parts[3]);
+console.log("part[4]", parts[4]);
+console.log("part[5]", parts[5]);
     if (parts.length < 4) {
         return {
             presentAddress: "",
@@ -1577,6 +1590,8 @@ function getSepareteStatus(text) {
 
     const permanentAddress = `${parts[3]}`;
 
+console.log(" premanentAddress : ", presentAddress);
+console.log(" permanentAddress : ", permanentAddress)
     return {
         presentAddress,
         permanentAddress

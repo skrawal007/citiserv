@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE } from '../../config/env';
 
-export default function EmployeeModule({ activeFilter }) {
+export default function CombinedDashboardModule({ activeFilter }) {
   const [stationRows, setStationRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,26 +12,31 @@ export default function EmployeeModule({ activeFilter }) {
   const [maxDate, setMaxDate] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
+  
   useEffect(() => {
     loadStationData();
-  }, [activeFilter]);
+  }, []);
 
   async function loadStationData(startDate = '', endDate = '') {
     setLoading(true);
     setError('');
+    console.log("activeFilter in charcter  filter ", activeFilter);
     try {
-      const res = await axios.get(`${API_BASE}/dashboard`, {
+      const res = await axios.get(`${API_BASE}/combinedDashbaord`, {
         params: {
-          type: "employee",
+          type: 'combined',
           sdate: startDate,
           edate: endDate
         }
       });
-      if (res.data && res.data.stationRows && res.data.stationRows.length > 0) {
-        setStationRows(res.data.stationRows);
+      if (res.data && res.data.DashboardResult && res.data.DashboardResult.length > 0) {
+        console.log(' res.data.DashboardResult.length ', res.data.DashboardResult.length);
+        console.log(' res.data.DashboardResult ',res.data.DashboardResult);
+
+      setStationRows(res.data?.DashboardResult || []);
       }
-      setMinDate(startDate);
-      setMaxDate(endDate);
+      // setMinDate(startDate);
+      // setMaxDate(endDate);
     } catch (e) {
       console.warn('Using default station reference data:', e.message);
     } finally {
@@ -109,7 +114,7 @@ export default function EmployeeModule({ activeFilter }) {
           <thead>
             <tr>
               <th colSpan="10" style={{ textAlign: 'center', fontSize: '18px', background: '#1e293b', color: '#fff', padding: '12px' }}>
-                Character Verification Dashboard 
+                 Verification Dashboard 
                 <br />
                  <p  style={{ fontSize: '12px', }}  >FROM 01.07.2026 TO 31.07.2026</p> 
               </th>
@@ -124,7 +129,7 @@ export default function EmployeeModule({ activeFilter }) {
             ) : null}
             <tr>
               <th>Sr.No.</th>
-              <th>Police Station</th>
+              <th>Verification Type</th>
               <th className={getHighlightClass('all')}>Received</th>
               <th className={getHighlightClass('remain')}>Pending</th>
               <th className={getHighlightClass('ps')}>PS</th>
@@ -147,7 +152,7 @@ export default function EmployeeModule({ activeFilter }) {
             {!loading && stationRows.map((r, i) => (
               <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
                 <td>{i + 1}</td>
-                <td style={{ fontWeight: '600' }}>{r.pre_station }</td>
+                <td style={{ fontWeight: '600' }}>{r.verification_type }</td>
                 <td className={getHighlightClass('all')}>
                   <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=all&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
                     {r.request_count || r.c_total || 0}

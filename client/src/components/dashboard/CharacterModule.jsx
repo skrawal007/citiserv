@@ -19,6 +19,7 @@ export default function CharacterModule({ activeFilter }) {
   async function loadStationData(startDate = '', endDate = '') {
     setLoading(true);
     setError('');
+    console.log("activeFilter in charcter  filter ", activeFilter);
     try {
       const res = await axios.get(`${API_BASE}/dashboard`, {
         params: {

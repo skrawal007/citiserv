@@ -4,6 +4,7 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import AgingSummaryTable from '../components/dashboard/AgingSummaryTable';
 import CharacterModule from '../components/dashboard/CharacterModule';
+import CombinedDashboardModule from '../components/dashboard/CombinedDashboardModule';
 import DomesticModule from '../components/dashboard/DomesticModule';
 import TenantModule from '../components/dashboard/TenantModule';
 import EmployeeModule from '../components/dashboard/EmployeeModule';
@@ -44,17 +45,19 @@ export default function Dashboard() {
       setActiveModule(null);
       setActiveFilter(null);
     }
+
+    console.log(" typeParam ", typeParam, "locParam ", locParam);
   }, [typeParam, locParam]);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [typeParam]);
 
   async function loadDashboardData() {
     setLoading(true);
     setError('');
     try {
-const res = await axios.get('/dashboard', {   params: { type: 'all' },   ...getAuthConfig(), });
+const res = await axios.get('/dashboard', {   params: { type: typeParam },   ...getAuthConfig(), });
       if (res.data && res.data.agingSummary && Array.isArray(res.data.agingSummary) && res.data.agingSummary.length > 0) {
         const merged = DEFAULT_AGING_DATA.map(def => {
           const found = res.data.agingSummary.find(r => r.app_type === def.label);
@@ -86,7 +89,7 @@ const res = await axios.get('/dashboard', {   params: { type: 'all' },   ...getA
     setLoading(true);
     setShowSearch(false);
     try {
-      const res = await axios.get('/dashboard', { params: { sdate, edate, type: 'all' } }, getAuthConfig());
+      const res = await axios.get('/dashboard', { params: { sdate, edate, type: typeParam } }, getAuthConfig());
       if (res.data?.agingSummary) setAgingRows(res.data.agingSummary);
     } catch (e) {
       setError(e.response?.data?.error || e.message);
@@ -190,8 +193,12 @@ const res = await axios.get('/dashboard', {   params: { type: 'all' },   ...getA
               {error && <div style={{ textAlign: 'center', padding: '20px', color: 'red' }}>{error}</div>}
               
               {!loading && !error && (
-                <AgingSummaryTable agingRows={agingRows} agingTotals={agingTotals} />
-              )}
+       <>
+       <AgingSummaryTable agingRows={agingRows} agingTotals={agingTotals} />
+       
+        <CombinedDashboardModule activeFilter={activeFilter} />
+</>
+)}
             </>
           )}
 
