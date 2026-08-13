@@ -45,7 +45,7 @@ const characterList = async (req, res, next) => {
       JOIN user_district ON user_district.district_id= district_.id
       WHERE  ${condition} 
       AND user_district.user_id = ?
-      ORDER BY pre_station, request_date;`;
+      ORDER BY pre_station_name, request_date;`;
 
     console.log(mysql.format(query,[req.user.userid]));
 
@@ -86,7 +86,7 @@ const employeeList = async (req, res, next) => {
     const stationColumn = employeeUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
 
 
-    // const query = `SELECT * FROM employees WHERE ${condition} ORDER BY pre_station, request_date`;
+    // const query = `SELECT * FROM employees WHERE ${condition} ORDER BY pre_station_name, request_date`;
 
     const query =` 
       SELECT employees.* FROM employees 
@@ -95,7 +95,7 @@ const employeeList = async (req, res, next) => {
       JOIN user_district ON user_district.district_id= district_.id
       WHERE  ${condition} 
 	      AND user_district.user_id = 10074
-      ORDER BY pre_station, request_date;`;
+      ORDER BY pre_station_name, request_date;`;
         
    console.log(mysql.format(query));
 
@@ -144,7 +144,7 @@ const tenantList = async (req, res, next) => {
       JOIN user_district ON user_district.district_id= district_.id
       WHERE  ${condition} 
 	      AND user_district.user_id = ?
-      ORDER BY pre_station, request_date;`;
+      ORDER BY pre_station_name, request_date;`;
         
    console.log(mysql.format(query));
 
@@ -191,7 +191,7 @@ const domesticList = async (req, res, next) => {
       JOIN user_district ON user_district.district_id= district_.id
       WHERE  ${condition} 
 	      AND user_district.user_id = ?
-      ORDER BY pre_station, request_date;`;
+      ORDER BY pre_station_name, request_date;`;
         
    console.log(mysql.format(query));
 
@@ -220,10 +220,16 @@ const Dashboard = async (req, res, next) => {
       tableType = 'tenants';
     } else if (type === 'domestic'){
       tableType ='domestic'
-    } 
+    } else {
+          res.json({
+      stationRows:   [],
+      agingSummary: [],
+    });
+    return;
+    }
     
    let query =`SELECT
-    p.pre_station,
+    p.pre_station_name,
     p.pre_station_code,
     p.request_count,
     p.approved_count,
@@ -238,7 +244,7 @@ const Dashboard = async (req, res, next) => {
 FROM
 (
     SELECT
-        pre_station,
+        pre_station_name,
         pre_station_code,
         COUNT(*) AS request_count,
 
@@ -267,7 +273,7 @@ SUM(
     JOIN district_ ON district_.code = station_.district_code
     JOIN user_district ud ON ud.district_id = district_.id
     WHERE ud.user_id = ?
-    GROUP BY pre_station,pre_station_code
+    GROUP BY pre_station_name,pre_station_code
 ) p
 LEFT JOIN
 (
@@ -281,7 +287,7 @@ LEFT JOIN
     WHERE ud.user_id = ? AND per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code
     GROUP BY per_station_code
 ) o ON p.pre_station_code = o.per_station_code
-ORDER BY p.pre_station`;
+ORDER BY p.pre_station_name`;
 
     const [stationRows] = await pool.execute(query,[userid,userid]);
 
@@ -301,8 +307,10 @@ const combinedDashbaord = async (req, res, next) => {
   console.log("TOKEN USER DATA:", req.user);
   try{
 
-    const { type, sdate, edate } = req.query;
-    const { userid, username, usertype } = req.user;
+    // const { type, sdate, edate } = req.query;
+    const { userid } = req.user;
+
+    // const { userid, username, usertype } = req.user;
 
     console.log( typeof userid);
    let  query=`WITH verification_records AS (
@@ -343,7 +351,6 @@ const combinedDashbaord = async (req, res, next) => {
 outgoing AS (
     SELECT
         vr.verification_type,
-        vr.pre_district_code AS district_code,
         COUNT(*) AS request_count,
 
         SUM(CASE WHEN vr.pre_Current_Status LIKE '%APPROVED%' THEN 1 ELSE 0 END) AS approved_count,
@@ -373,12 +380,11 @@ outgoing AS (
     JOIN district_ d ON d.code = vr.pre_district_code
     JOIN user_district ud ON ud.district_id = d.id
     WHERE ud.user_id = ?
-    GROUP BY vr.verification_type, vr.pre_district_code
+    GROUP BY vr.verification_type
 ),
 incoming AS (
     SELECT
         vr.verification_type,
-        vr.per_district_code,
         COUNT(*) AS other_to_own
     FROM verification_records vr
     JOIN district_ d ON d.code = vr.per_district_code
@@ -387,11 +393,10 @@ incoming AS (
       AND vr.per_Current_Status IS NOT NULL
       AND vr.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
       AND vr.pre_district_code <> vr.per_district_code
-    GROUP BY vr.verification_type, vr.per_district_code
+    GROUP BY vr.verification_type
 )
 SELECT
     o.verification_type,
-    o.district_code,
     o.request_count,
     o.approved_count,
     o.rejected_count,
@@ -405,14 +410,10 @@ SELECT
 FROM outgoing o
 LEFT JOIN incoming i
     ON i.verification_type = o.verification_type
-   AND i.per_district_code = o.district_code
-ORDER BY o.verification_type, o.district_code;`;
+ORDER BY o.verification_type;`;
 
-    const [result] = await pool.execute(query,[userid,userid]);
-    console.log( "result length ; ",result.length);
-
-    // console.log(mysql.format(query,[userid,userid]));
-
+    const [result] = await pool.execute(query, [userid, userid]);
+    console.log('Combined dashboard result length:', result.length);
 
     res.json({
         DashboardResult : result

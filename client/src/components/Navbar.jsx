@@ -59,7 +59,7 @@ export default function Navbar() {
       <nav className="navbar-menu-container">
         <ul className="menu">
           <li className={isDashboardActive ? 'active-menu' : ''}>
-            <Link to="/dashboard?type=all" className="menu-title">🖥️ Dashboard</Link>
+            <Link to="/dashboard" className="menu-title">🖥️ Dashboard</Link>
             <ul>
               <li className={isDashboardActive && currentType === 'character' ? 'active-sub' : ''}>
                 <Link to="/dashboard?type=character">🛡️ Character (चरित्र)</Link>

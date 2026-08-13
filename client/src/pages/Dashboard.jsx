@@ -50,6 +50,16 @@ export default function Dashboard() {
   }, [typeParam, locParam]);
 
   useEffect(() => {
+    const dashboardTypes = ['character', 'domestic', 'tenant', 'employee'];
+
+    // The overview is rendered by CombinedDashboardModule. Do not call the
+    // station-specific /dashboard endpoint with type=all or no type.
+    if (!dashboardTypes.includes(typeParam)) {
+      setLoading(false);
+      setError('');
+      return;
+    }
+
     loadDashboardData();
   }, [typeParam]);
 
@@ -61,17 +71,17 @@ const res = await axios.get('/dashboard', {   params: { type: typeParam },   ...
       if (res.data && res.data.agingSummary && Array.isArray(res.data.agingSummary) && res.data.agingSummary.length > 0) {
         const merged = DEFAULT_AGING_DATA.map(def => {
           const found = res.data.agingSummary.find(r => r.app_type === def.label);
-          if (found && (found.d15 > 0 || found.d30 > 0 || found.d90 > 0 || found.d180 > 0 || found.d365 > 0 || found.dAbove1 > 0)) {
-            return {
-              ...def,
-              d15: found.d15,
-              d30: found.d30,
-              d90: found.d90,
-              d180: found.d180,
-              d365: found.d365,
-              dAbove1: found.dAbove1,
-            };
-          }
+          // if (found && (found.d15 > 0 || found.d30 > 0 || found.d90 > 0 || found.d180 > 0 || found.d365 > 0 || found.dAbove1 > 0)) {
+          //   return {
+          //     ...def,
+          //     d15: found.d15,
+          //     d30: found.d30,
+          //     d90: found.d90,
+          //     d180: found.d180,
+          //     d365: found.d365,
+          //     dAbove1: found.dAbove1,
+          //   };
+          // }
           return def;
         });
         setAgingRows(merged);
@@ -98,16 +108,16 @@ const res = await axios.get('/dashboard', {   params: { type: typeParam },   ...
     }
   }
 
-  const handleSelectModule = (mod) => {
-    if (mod === 'all' || !mod) {
-      setActiveModule(null);
-      setActiveFilter(null);
-      setSearchParams({});
-    } else {
-      setActiveModule(mod);
-      setSearchParams({ type: mod });
-    }
-  };
+  // const handleSelectModule = (mod) => {
+  //   if (mod === 'all' || !mod) {
+  //     setActiveModule(null);
+  //     setActiveFilter(null);
+  //     setSearchParams({});
+  //   } else {
+  //     setActiveModule(mod);
+  //     setSearchParams({ type: mod });
+  //   }
+  // };
 
   // Calculate Aging Totals
   const agingTotals = agingRows.reduce(
@@ -194,9 +204,10 @@ const res = await axios.get('/dashboard', {   params: { type: typeParam },   ...
               
               {!loading && !error && (
        <>
+        <CombinedDashboardModule activeFilter={activeFilter} />
+
        <AgingSummaryTable agingRows={agingRows} agingTotals={agingTotals} />
        
-        <CombinedDashboardModule activeFilter={activeFilter} />
 </>
 )}
             </>

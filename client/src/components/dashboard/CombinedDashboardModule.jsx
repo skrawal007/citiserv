@@ -2,6 +2,36 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE } from '../../config/env';
 
+// Keep the initial dashboard response for this browser page session. React
+// Strict Mode may remount this component in development; a remount must not
+// request a second, potentially different dashboard snapshot.
+let initialDashboardRequest = null;
+
+function fetchCombinedDashboard(startDate = '', endDate = '') {
+  const isInitialLoad = !startDate && !endDate;
+
+  if (isInitialLoad && initialDashboardRequest) {
+    return initialDashboardRequest;
+  }
+
+  const request = axios.get(`${API_BASE}/combinedDashbaord`, {
+    params: {
+      type: 'combined',
+      sdate: startDate,
+      edate: endDate,
+    },
+  });
+
+  if (isInitialLoad) {
+    initialDashboardRequest = request;
+    request.catch(() => {
+      initialDashboardRequest = null;
+    });
+  }
+
+  return request;
+}
+
 export default function CombinedDashboardModule({ activeFilter }) {
   const [stationRows, setStationRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -12,7 +42,6 @@ export default function CombinedDashboardModule({ activeFilter }) {
   const [maxDate, setMaxDate] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
-  
   useEffect(() => {
     loadStationData();
   }, []);
@@ -22,18 +51,11 @@ export default function CombinedDashboardModule({ activeFilter }) {
     setError('');
     console.log("activeFilter in charcter  filter ", activeFilter);
     try {
-      const res = await axios.get(`${API_BASE}/combinedDashbaord`, {
-        params: {
-          type: 'combined',
-          sdate: startDate,
-          edate: endDate
-        }
-      });
+      const res = await fetchCombinedDashboard(startDate, endDate);
       if (res.data && res.data.DashboardResult && res.data.DashboardResult.length > 0) {
         console.log(' res.data.DashboardResult.length ', res.data.DashboardResult.length);
         console.log(' res.data.DashboardResult ',res.data.DashboardResult);
-
-      setStationRows(res.data?.DashboardResult || []);
+        setStationRows(res.data?.DashboardResult || []);
       }
       // setMinDate(startDate);
       // setMaxDate(endDate);
