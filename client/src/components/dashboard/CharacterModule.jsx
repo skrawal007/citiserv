@@ -6,17 +6,30 @@ export default function CharacterModule({ activeFilter }) {
   const [stationRows, setStationRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sdate, setSdate] = useState('');
-  const [edate, setEdate] = useState('');
+  // const [sdate, setSdate] = useState('');
+  // const [edate, setEdate] = useState('');
   const [minDate, setMinDate] = useState('');
   const [maxDate, setMaxDate] = useState('');
   const [showSearch, setShowSearch] = useState(false);
+
+  const getDateString = (date) => {
+  return date.toISOString().split("T")[0];
+};
+
+const today = new Date();
+
+const oneMonthAgo = new Date(today);
+oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+const [sdate, setSdate] = useState(getDateString(oneMonthAgo));
+const [edate, setEdate] = useState(getDateString(today));
+
 
   useEffect(() => {
     loadStationData();
   }, []);
 
-  async function loadStationData(startDate = '', endDate = '') {
+  async function loadStationData() {
     setLoading(true);
     setError('');
     console.log("activeFilter in charcter  filter ", activeFilter);
@@ -24,12 +37,13 @@ export default function CharacterModule({ activeFilter }) {
       const res = await axios.get(`${API_BASE}/dashboard`, {
         params: {
           type: 'character',
-          sdate: startDate,
-          edate: endDate
+          sdate: sdate,
+          edate: edate
         }
       });
       if (res.data && res.data.stationRows && res.data.stationRows.length > 0) {
         setStationRows(res.data.stationRows);
+        console.log("res.data.stationRows ",res.data.stationRows);
       }
       setMinDate(startDate);
       setMaxDate(endDate);
@@ -46,6 +60,7 @@ export default function CharacterModule({ activeFilter }) {
       alert('कृपया दोनों दिनांक भरें');
       return;
     }
+    console.log("handaleSearchSubmti sdate ",sdate, " edate ", edate );
     loadStationData(sdate, edate);
     setShowSearch(false);
   }
@@ -112,7 +127,7 @@ export default function CharacterModule({ activeFilter }) {
               <th colSpan="10" style={{ textAlign: 'center', fontSize: '18px', background: '#1e293b', color: '#fff', padding: '12px' }}>
                 Character Verification Dashboard 
                 <br />
-                 <p  style={{ fontSize: '12px', }}  >FROM 01.07.2026 TO 31.07.2026</p> 
+                 <p  style={{ fontSize: '12px', }}  >FROM {sdate} TO {edate}</p> 
               </th>
             </tr>
             {minDate || maxDate ? (
@@ -148,7 +163,7 @@ export default function CharacterModule({ activeFilter }) {
             {!loading && stationRows.map((r, i) => (
               <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
                 <td>{i + 1}</td>
-                <td style={{ fontWeight: '600' }}>{r.pre_station }</td>
+                <td style={{ fontWeight: '600' }}>{r.pre_station_name }</td>
                 <td className={getHighlightClass('all')}>
                   <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=all&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
                     {r.request_count || r.c_total || 0}

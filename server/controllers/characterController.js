@@ -46,7 +46,7 @@ const characterList = async (req, res, next) => {
       AND user_district.user_id = ?
       ORDER BY pre_station_name, request_date;`;
 
-    console.log(mysql.format(query,[req.user.userid]));
+    // console.log(mysql.format(query,[req.user.userid]));
 
       const [rows] = await pool.execute(query, [userid]);
 
@@ -96,7 +96,7 @@ const employeeList = async (req, res, next) => {
 	      AND user_district.user_id = 10074
       ORDER BY pre_station_name, request_date;`;
         
-   console.log(mysql.format(query));
+  //  console.log(mysql.format(query));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -145,7 +145,7 @@ const tenantList = async (req, res, next) => {
 	      AND user_district.user_id = ?
       ORDER BY pre_station_name, request_date;`;
         
-   console.log(mysql.format(query));
+  //  console.log(mysql.format(query));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -192,7 +192,7 @@ const domesticList = async (req, res, next) => {
 	      AND user_district.user_id = ?
       ORDER BY pre_station_name, request_date;`;
         
-   console.log(mysql.format(query));
+ //  console.log(mysql.format(query));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -247,7 +247,7 @@ const complaintList = async (req, res, next) => {
           WHERE ${condition} AND user_district.user_id = ?
           ORDER BY  request_date;`;
         
-   console.log(mysql.format(query));
+  // console.log(mysql.format(query));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -303,7 +303,7 @@ const postmortemList = async (req, res, next) => {
           WHERE ${condition} AND user_district.user_id = ?
           ORDER BY  request_date;`;
         
-   console.log(mysql.format(query));
+   //console.log(mysql.format(query));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -316,7 +316,7 @@ const postmortemList = async (req, res, next) => {
 
 const Dashboard = async (req, res, next) => {
   console.log('Dashboard request received with query:', req.query);
-  console.log("TOKEN USER DATA:", req.user);
+  // console.log("TOKEN USER DATA:", req.user);
   try {
     const { type, sdate, edate } = req.query;
     const { userid, username, usertype } = req.user;
@@ -336,7 +336,11 @@ const Dashboard = async (req, res, next) => {
     });
     return;
     }
-    
+    let dateCondtion='';
+
+    if(sdate && edate){
+     dateCondtion =`AND request_date BETWEEN '${sdate}' AND '${edate}'`;
+    }
    let query =`SELECT
     p.pre_station_name,
     p.pre_station_code,
@@ -381,7 +385,7 @@ SUM(
     JOIN station_ ON station_.code = ${tableType}.pre_station_code
     JOIN district_ ON district_.code = station_.district_code
     JOIN user_district ud ON ud.district_id = district_.id
-    WHERE ud.user_id = ?
+    WHERE ud.user_id = ? ${dateCondtion}
     GROUP BY pre_station_name,pre_station_code
 ) p
 LEFT JOIN
@@ -400,6 +404,8 @@ ORDER BY p.pre_station_name`;
 
     const [stationRows] = await pool.execute(query,[userid,userid]);
 
+        // console.log(mysql.format(query,[userid,userid]));
+
     const agingSummary = await fetchAgingSummary(sdate, edate);
 
     res.json({
@@ -413,7 +419,7 @@ ORDER BY p.pre_station_name`;
 
 const combinedDashbaord = async (req, res, next) => {
   console.log('Dashboard request received with query:', req.query);
-  console.log("TOKEN USER DATA:", req.user);
+  // console.log("TOKEN USER DATA:", req.user);
   try{
 
     // const { type, sdate, edate } = req.query;
