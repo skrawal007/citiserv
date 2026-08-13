@@ -12,7 +12,7 @@ const MODULE_NAMES = {
   tenant: 'किरायेदार सत्यापन',
   domestic: 'घरेलू सहायक सत्यापन',
   employee: 'कर्मचारी सत्यापन',
-  complaints: 'शिकायत निवारण',
+  complaint: 'शिकायत निवारण',
   all: 'सत्यापन',
 };
 
@@ -30,18 +30,22 @@ const LIST_ENDPOINTS = {
   employee: '/employeeList',
   tenant: '/tenantList',
   domestic: '/domesticList',
+  complaint : '/complaintList',
+  postmortem : '/postmortemList'
+
 };
 
  
 const hideStatus = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
 const hidePraAdd = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
+const hidePreAdd = (type) =>['complaint', 'postmortem'].includes(type);
 
 function fmt(d) { return d ? d.split('-').reverse().join('-') : ''; }
 
 export default function Characters() {
   const [searchParams] = useSearchParams();
-  const loc = searchParams.get('loc') || 'totalremain';
-  const type = searchParams.get('type') || 'character';
+  const loc = searchParams.get('loc');
+  const type = searchParams.get('type');
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -49,7 +53,7 @@ export default function Characters() {
 
 useEffect(() => {
   const fetchData = async () => {
-    try {
+    try { 
       setLoading(true);
       setError("");
       setRows([]);
@@ -64,12 +68,16 @@ useEffect(() => {
       });
 
       setRows(res.data || []);
+      console.log(" res.data ", res.data);
+
     } catch (e) {
       setError(e.response?.data?.error || e.message);
     } finally {
       setLoading(false);
     }
   };
+console.log("hidePreAdd " , hidePreAdd(type));
+
 
   fetchData();
 }, [loc, type]);
@@ -80,6 +88,7 @@ useEffect(() => {
   const heading = `${locHeading} ${moduleName}`.trim();
   const hideStatusCol = hideStatus(loc);
   const hidePraAddCol = hidePraAdd(loc);
+  const hidePreAddCol = hidePreAdd(type);
 
   return (
     <>
@@ -98,8 +107,8 @@ useEffect(() => {
               <th>REQUEST NUMBER</th>
               <th>REQUEST DATE</th>
               <th>APPLICANT NAME</th>
-              <th>PRESENT ADDRESS</th>
-              <th> PRESENT ADD STATUS</th>
+               {!hidePreAddCol && <th>PRESENT ADDRESS</th>}
+              {!hidePreAddCol ?  <th> PRESENT ADD STATUS</th> :  <th> STATUS</th> }
               {!hidePraAddCol && <th>PERMANENT ADDRESS</th>}
               {!hideStatusCol && <th> PERMANENT ADD STATUS</th>}
             </tr>
@@ -114,11 +123,11 @@ useEffect(() => {
             {!loading && rows.map((r, i) => (
               <tr key={i}>
                 <td>{i + 1}</td>
-                <td>{r['थाना'] || r.pre_station}</td>
+                <td>{r['थाना'] || r.pre_station_name}</td>
                 <td>{r['अनुरोध_संख्या'] || r.request_number}</td>
                 <td>{formatDate(r['अनुरोध_दिनांक'] || r.request_date)}</td>
                 <td>{r['आवेदक_का_नाम'] || r.applicant_name}</td>
-                <td>{r.present_address}</td>
+                {!hidePreAddCol && <td>{r.present_address}</td>}
                 <td>{r.pre_Current_Status}</td>
 
                 {!hidePraAddCol && <td>{ r.permanent_address}</td>}

@@ -17,6 +17,9 @@ export default function Navbar() {
   const isEmployeeActive = currentPath === '/characters' && currentType === 'employee';
   const isTenantActive = currentPath === '/characters' && currentType === 'tenant';
   const isDomesticActive = currentPath === '/characters' && currentType === 'domestic';
+  const isComplaintsActive = currentPath === '/characters' && currentType === 'complaint';
+  const isPostmortemActive = currentPath === '/characters' && currentType === 'postmortem';
+ 
 
   const handleLogout = () => {
     logout();
@@ -73,8 +76,8 @@ export default function Navbar() {
               <li className={isDashboardActive && currentType === 'domestic' ? 'active-sub' : ''}>
                 <Link to="/dashboard?type=domestic">🧹 Domestic (घरेलू)</Link>
               </li>
-              <li className={isDashboardActive && currentType === 'complaints' ? 'active-sub' : ''}>
-                <Link to="/dashboard?type=complaints">📢 Complaints (शिकायत)</Link>
+              <li className={isDashboardActive && currentType === 'complaint' ? 'active-sub' : ''}>
+                <Link to="/dashboard?type=complaint">📢 Complaint (शिकायत)</Link>
               </li>
             </ul>
           </li>
@@ -175,7 +178,45 @@ export default function Navbar() {
               
             </ul>
           </li>
+          {/* Complaint Navbar */}
 
+                <li className={isComplaintsActive ? 'active-menu' : ''}>
+            <Link to="/characters?type=complaint&loc=totalremain" className="menu-title">🧹 Complaints</Link>
+            <ul>
+              <li className={isComplaintsActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+                <Link to="/characters?type=complaint&loc=totalps">STATION (थाना)</Link>
+              </li>
+              <li className={isComplaintsActive && currentLoc === 'totalliu' ? 'active-sub' : ''}>
+                <Link to="/characters?type=complaint&loc=totalliu">LIU (एलआईयू)</Link>
+              </li>
+              <li className={isComplaintsActive && currentLoc === 'totaldcrb' ? 'active-sub' : ''}>
+                <Link to="/characters?type=complaint&loc=totaldcrb">DCRB (डीसीआरबी)</Link>
+              </li>
+              <li className={isComplaintsActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
+                <Link to="/characters?type=complaint&loc=totaldcp">DCP (डीसीपी)</Link>
+              </li>
+              
+              
+            </ul>
+          </li>
+
+          {/* POSTMORTEM Navbar */}
+
+                <li className={isPostmortemActive ? 'active-menu' : ''}>
+            <Link to="/characters?type=postmortem&loc=totalremain" className="menu-title">🧹 Postmortem</Link>
+            <ul>
+              <li className={isPostmortemActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+                <Link to="/characters?type=postmortem&loc=totalps">STATION (थाना)</Link>
+              </li>
+              <li className={isPostmortemActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
+                <Link to="/characters?type=postmortem&loc=totaldcp">DCP (डीसीपी)</Link>
+              </li>
+              
+              
+            </ul>
+          </li>
+
+          {/* Upload files for view admin only   */}
           <li className={isUploadActive ? 'active-menu' : ''}>
             <Link to="/upload" className="menu-title">📤 Uploads</Link>
             <ul>

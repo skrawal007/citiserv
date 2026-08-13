@@ -8,7 +8,7 @@ const MODULE_NAMES = {
   tenant: 'किरायेदार सत्यापन',
   domestic: 'घरेलू सहायक सत्यापन',
   employee: 'कर्मचारी सत्यापन',
-  complaints: 'शिकायत निवारण',
+  complaint: 'शिकायत निवारण',
   all: 'सत्यापन',
 };
 
@@ -59,7 +59,7 @@ export default function Detail() {
     axios.get('/details', {
       params: { loc, ps, sdate, edate, cug, type }
     })
-      .then(res => setRows(res.data || []))
+      .then(res => {setRows(res.data || []); console.log(res.data)})
       .catch(e => setError(e.response?.data?.error || e.message))
       .finally(() => setLoading(false));
   }, [loc, ps, sdate, edate, cug, type]);

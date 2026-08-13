@@ -9,7 +9,7 @@ const MODULE_NAMES = {
   tenant: 'Tenant Verification',
   domestic: 'Domestic Help Verification',
   employee: 'Employee Verification',
-  complaints: 'Complaints Data',
+  complaint: 'Complaints Data',
   all: 'Verification Data',
 };
 

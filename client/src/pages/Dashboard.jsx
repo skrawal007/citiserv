@@ -8,6 +8,7 @@ import CombinedDashboardModule from '../components/dashboard/CombinedDashboardMo
 import DomesticModule from '../components/dashboard/DomesticModule';
 import TenantModule from '../components/dashboard/TenantModule';
 import EmployeeModule from '../components/dashboard/EmployeeModule';
+import ComplaintModule from '../components/dashboard/ComplaintModule';
 import getAuthConfig from "../functions/getAuthConfig";
 
 
@@ -17,7 +18,7 @@ const DEFAULT_AGING_DATA = [
   { sno: 2, typeKey: 'domestic', label: 'घरेलू सहायता सत्यापन', d15: 9, d30: 4, d90: 2, d180: 0, d365: 0, dAbove1: 0 },
   { sno: 3, typeKey: 'character', label: 'चरित्र सत्यापन', d15: 1747, d30: 0, d90: 0, d180: 0, d365: 0, dAbove1: 0 },
   { sno: 4, typeKey: 'postmortem', label: 'पोस्टमार्टम रिपोर्ट अनुरोध', d15: 1, d30: 0, d90: 0, d180: 0, d365: 0, dAbove1: 0 },
-  { sno: 5, typeKey: 'complaints', label: 'शिकायत', d15: 3, d30: 1, d90: 0, d180: 0, d365: 0, dAbove1: 0 },
+  { sno: 5, typeKey: 'complaint', label: 'शिकायत', d15: 3, d30: 1, d90: 0, d180: 0, d365: 0, dAbove1: 0 },
 ];
 
 export default function Dashboard() {
@@ -232,6 +233,12 @@ const res = await axios.get('/dashboard', {   params: { type: typeParam },   ...
           {activeModule === 'employee' && (
             <EmployeeModule activeFilter={activeFilter} />
           )}
+
+          {/* Module 5: Complaint */}
+          {activeModule === 'complaint' && (
+            <ComplaintModule activeFilter={activeFilter} />
+          )}
+
 
         </div>
 

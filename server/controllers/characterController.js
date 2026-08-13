@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../database/db');
 const { processExcelBuffer } = require('../utils/excelParser');
 const mysql =require('mysql2/promise');
+
 const {
   PS_STATUSES,
   LIU_STATUSES,
@@ -10,8 +11,6 @@ const {
   DCP_STATUSES,
   makePlaceholders,
 } = require('../constants/statusConstants');
-
-
 
 const characterList = async (req, res, next) => {
   try {
@@ -204,6 +203,116 @@ const domesticList = async (req, res, next) => {
   }
 };
 
+// complaintList
+
+const complaintList = async (req, res, next) => {
+  try {
+    const { loc } = req.query;
+    const {userid} =req.user;
+    if (!loc) {
+      return res.status(400).json({ error: 'loc parameter is required' });
+    }
+
+    const conditions = {
+      totaldcp: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP', 'DCP')",
+      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
+      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
+      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
+      totaldiff: 'pre_station_code <> per_station_code',
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+    const condition = conditions[loc];
+    if (!condition) {
+      return res.status(400).json({ error: 'Invalid list location' });
+    }
+  
+    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
+
+
+
+    const query =`
+        SELECT 
+
+        complaints.district_code AS pre_district_code,
+        complaints.district_name AS pre_district_name,
+        complaints.station_code AS pre_station_code,
+        complaints.station_name AS pre_station_name,
+
+        complaints.*
+        FROM complaints 
+          JOIN station_ ON station_.code = station_code
+          JOIN district_ ON district_.code = station_.district_code
+          JOIN user_district ON user_district.district_id= district_.id
+          WHERE ${condition} AND user_district.user_id = ?
+          ORDER BY  request_date;`;
+        
+   console.log(mysql.format(query));
+
+    const [rows] = await pool.execute(query,[userid]);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('Error fetching domestic list:', err);
+    return next(err);
+  }
+};
+
+// postmortemList
+
+
+const postmortemList = async (req, res, next) => {
+  try {
+    const { loc } = req.query;
+    const {userid} =req.user;
+    if (!loc) {
+      return res.status(400).json({ error: 'loc parameter is required' });
+    }
+
+    const conditions = {
+      totaldcp: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP', 'DCP')",
+      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
+      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
+      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
+      totaldiff: 'pre_station_code <> per_station_code',
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+    const condition = conditions[loc];
+    if (!condition) {
+      return res.status(400).json({ error: 'Invalid list location' });
+    }
+  
+    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
+
+
+
+    const query =`
+        SELECT 
+
+        postmortem.district_code AS pre_district_code,
+        postmortem.district_name AS pre_district_name,
+        postmortem.station_code AS pre_station_code,
+        postmortem.station_name AS pre_station_name,
+
+        postmortem.*
+        FROM postmortem 
+          JOIN station_ ON station_.code = station_code
+          JOIN district_ ON district_.code = station_.district_code
+          JOIN user_district ON user_district.district_id= district_.id
+          WHERE ${condition} AND user_district.user_id = ?
+          ORDER BY  request_date;`;
+        
+   console.log(mysql.format(query));
+
+    const [rows] = await pool.execute(query,[userid]);
+
+    return res.json(rows);
+  } catch (err) {
+    console.error('Error fetching domestic list:', err);
+    return next(err);
+  }
+};
 
 const Dashboard = async (req, res, next) => {
   console.log('Dashboard request received with query:', req.query);
@@ -559,9 +668,6 @@ const loginsession = async (req, res) => {
 
 
 
-
-
-
 // Dynamic helper to resolve ps source
 const getPsSource = async () => {
   try {
@@ -841,6 +947,8 @@ module.exports = {
   employeeList,
   tenantList,
   domesticList,
+  postmortemList,
   login,
   loginsession,
+  complaintList
 };
