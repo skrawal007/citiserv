@@ -246,6 +246,7 @@ export default function Dashboard() {
           style={{ marginTop: "12px" }}
         >
           <DateSearchHeader
+            title="🛡️ चरित्र सत्यापन स्थिति (Character Verification - Satyapan Table)"
             showSearch={showSearch}
             setShowSearch={setShowSearch}
             sdate={sdate}
@@ -325,15 +326,34 @@ export default function Dashboard() {
           )}
 
           {/* Module 1: Character (Contains the Satyapan Station Table) */}
-           {activeModule &&  <CharacterModule
+          {activeModule === "character" && (
+            <CharacterModule
               activeFilter={activeFilter}
               activeModule={activeModule}
               sdate={sdate}
               edate={edate}
             />
-           }
+          )}
 
-      
+          Module 2: Domestic
+          {activeModule === "domestic" && (
+            <DomesticModule activeFilter={activeFilter} />
+          )}
+
+          {/* Module 3: Tenant */}
+          {activeModule === "tenant" && (
+            <TenantModule activeFilter={activeFilter} />
+          )}
+
+          {/* Module 4: Employee */}
+          {activeModule === "employee" && (
+            <EmployeeModule activeFilter={activeFilter} />
+          )}
+
+          {/* Module 5: Complaint */}
+          {activeModule === "complaint" && (
+            <ComplaintModule activeFilter={activeFilter} />
+          )}
         </div>
       </div>
     </>
