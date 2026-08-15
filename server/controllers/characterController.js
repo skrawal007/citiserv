@@ -14,7 +14,8 @@ const {
 
 const characterList = async (req, res, next) => {
   try {
-    const { loc } = req.query;
+    console.log("Charcter list req.query ", req.query);
+    const { loc,sdate,edate } = req.query;
     const {userid} =req.user;
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
@@ -43,12 +44,12 @@ const characterList = async (req, res, next) => {
       JOIN district_ ON district_.code = station_.district_code
       JOIN user_district ON user_district.district_id= district_.id
       WHERE  ${condition} 
-      AND user_district.user_id = ?
+      AND user_district.user_id = ? AND request_date BETWEEN ? AND ? 
       ORDER BY pre_station_name, request_date;`;
 
     // console.log(mysql.format(query,[req.user.userid]));
 
-      const [rows] = await pool.execute(query, [userid]);
+      const [rows] = await pool.execute(query, [userid, sdate,edate]);
 
     return res.json(rows);
   } catch (err) {
@@ -404,7 +405,7 @@ ORDER BY p.pre_station_name`;
 
     const [stationRows] = await pool.execute(query,[userid,userid]);
 
-        // console.log(mysql.format(query,[userid,userid]));
+         console.log(mysql.format(query,[userid,userid]));
 
     const agingSummary = await fetchAgingSummary(sdate, edate);
 

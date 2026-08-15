@@ -5,9 +5,6 @@ import Navbar from "../components/Navbar";
 import AgingSummaryTable from "../components/dashboard/AgingSummaryTable";
 import CharacterModule from "../components/dashboard/CharacterModule";
 import CombinedDashboardModule from "../components/dashboard/CombinedDashboardModule";
-import DomesticModule from "../components/dashboard/DomesticModule";
-import TenantModule from "../components/dashboard/TenantModule";
-import EmployeeModule from "../components/dashboard/EmployeeModule";
 import ComplaintModule from "../components/dashboard/ComplaintModule";
 import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
@@ -71,7 +68,14 @@ const DEFAULT_AGING_DATA = [
   },
 ];
 
-export default function Dashboard() {
+export default function Dashboard({
+  showSearch, 
+  setShowSearch,
+  sdate,
+  setSdate,
+  edate,
+  setEdate,
+}) {
   const [searchParams, setSearchParams] = useSearchParams();
   const typeParam = searchParams.get("type");
   const locParam = searchParams.get("loc");
@@ -81,22 +85,12 @@ export default function Dashboard() {
   const [activeFilter, setActiveFilter] = useState(null);
 
   const [agingRows, setAgingRows] = useState(DEFAULT_AGING_DATA);
-  const [showSearch, setShowSearch] = useState(false);
+  // const [showSearch, setShowSearch] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const getDateString = (date) => {
-    return date.toISOString().split("T")[0];
-  };
 
-  const today = new Date();
-
-  const oneMonthAgo = new Date(today);
-  oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
-
-  const [sdate, setSdate] = useState(getDateString(oneMonthAgo));
-  const [edate, setEdate] = useState(getDateString(today));
 
   // Synchronize state with URL parameters
   useEffect(() => {
@@ -111,7 +105,7 @@ export default function Dashboard() {
       setActiveFilter(null);
     }
 
-    console.log(" typeParam ", typeParam, "locParam ", locParam);
+    // console.log(" typeParam ", typeParam, "locParam ", locParam);
   }, [typeParam, locParam]);
 
   useEffect(() => {
@@ -168,40 +162,6 @@ export default function Dashboard() {
     }
   }
 
-  async function handleSearch(e) {
-    e.preventDefault();
-    if (!sdate || !edate) {
-      alert("कृपया दोनों दिनांक भरें");
-      return;
-    }
-    setLoading(true);
-    setShowSearch(false);
-    try {
-      const res = await axios.get(
-        "/dashboard",
-        { params: { sdate, edate, type: typeParam } },
-        getAuthConfig(),
-      );
-      if (res.data?.agingSummary) setAgingRows(res.data.agingSummary);
-    } catch (e) {
-      setError(e.response?.data?.error || e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  // const handleSelectModule = (mod) => {
-  //   if (mod === 'all' || !mod) {
-  //     setActiveModule(null);
-  //     setActiveFilter(null);
-  //     setSearchParams({});
-  //   } else {
-  //     setActiveModule(mod);
-  //     setSearchParams({ type: mod });
-  //   }
-  // };
-
-  // Calculate Aging Totals
   const agingTotals = agingRows.reduce(
     (acc, r) => ({
       d15: acc.d15 + Number(r.d15 || 0),
@@ -219,79 +179,22 @@ export default function Dashboard() {
       <Navbar />
 
       <div className="dashboard-container" style={{ padding: "20px 30px" }}>
-        {/* Search Modal */}
-        {/* {showSearch && (
-          <div className="search-modal-overlay">
-            <form className="search-form" onSubmit={handleSearch}>
-              <h2>दिनांक द्वारा रिकॉर्ड खोजें</h2>
-              <div className="inputs">
-                <label>आरम्भ दिनांक (From Date)</label>
-                <input type="date" value={sdate} onChange={e => setSdate(e.target.value)} />
-              </div>
-              <div className="inputs">
-                <label>अंतिम दिनांक (To Date) <span style={{ color: 'red' }}>*</span></label>
-                <input type="date" value={edate} onChange={e => setEdate(e.target.value)} required />
-              </div>
-              <div className="btn-container">
-                <button type="submit">SEARCH</button>
-                <button type="button" onClick={() => setShowSearch(false)}>CLOSE</button>
-              </div>
-            </form>
-          </div>
-        )} */}
-
         {/* ── DYNAMIC SUB-COMPONENT DISPLAY AREA ── */}
         <div
           className="main-content-display-area"
           style={{ marginTop: "12px" }}
         >
           <DateSearchHeader
-            showSearch={showSearch}
-            setShowSearch={setShowSearch}
+           showSearch={showSearch}
+           setShowSearch={setShowSearch}
             sdate={sdate}
             setSdate={setSdate}
             edate={edate}
             setEdate={setEdate}
-            // handleSearchSubmit={handleSearchSubmit}
           />
           {/* Landing Overview: Shows Metric Summary Cards & Aging Summary Table */}
           {!activeModule && (
             <>
-              {/* Stat Cards Grid */}
-              <div
-                className="dashboard-stats-grid"
-                style={{ marginBottom: "24px" }}
-              >
-                <div className="stat-card blue">
-                  <div className="stat-icon">📑</div>
-                  <div className="stat-info">
-                    <span className="stat-title">कुल प्राप्त आवेदन</span>
-                    <span className="stat-number">1,791</span>
-                  </div>
-                </div>
-                <div className="stat-card orange">
-                  <div className="stat-icon">⏳</div>
-                  <div className="stat-info">
-                    <span className="stat-title">लम्बित सत्यापन</span>
-                    <span className="stat-number">1,788</span>
-                  </div>
-                </div>
-                <div className="stat-card teal">
-                  <div className="stat-icon">✅</div>
-                  <div className="stat-info">
-                    <span className="stat-title">सत्यापित एवं निस्तारित</span>
-                    <span className="stat-number">3</span>
-                  </div>
-                </div>
-                <div className="stat-card purple">
-                  <div className="stat-icon">🏢</div>
-                  <div className="stat-info">
-                    <span className="stat-title">थाने स्तर पर लम्बित</span>
-                    <span className="stat-number">1,747</span>
-                  </div>
-                </div>
-              </div>
-
               {loading && (
                 <div
                   style={{
@@ -325,15 +228,14 @@ export default function Dashboard() {
           )}
 
           {/* Module 1: Character (Contains the Satyapan Station Table) */}
-           {activeModule &&  <CharacterModule
+          {activeModule && (
+            <CharacterModule
               activeFilter={activeFilter}
               activeModule={activeModule}
               sdate={sdate}
               edate={edate}
             />
-           }
-
-      
+          )}
         </div>
       </div>
     </>

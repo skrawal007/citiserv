@@ -49,12 +49,12 @@ export default function CombinedDashboardModule({ activeFilter }) {
   async function loadStationData(startDate = '', endDate = '') {
     setLoading(true);
     setError('');
-    console.log("activeFilter in charcter  filter ", activeFilter);
+    // console.log("activeFilter in charcter  filter ", activeFilter);
     try {
       const res = await fetchCombinedDashboard(startDate, endDate);
       if (res.data && res.data.DashboardResult && res.data.DashboardResult.length > 0) {
-        console.log(' res.data.DashboardResult.length ', res.data.DashboardResult.length);
-        console.log(' res.data.DashboardResult ',res.data.DashboardResult);
+        // console.log(' res.data.DashboardResult.length ', res.data.DashboardResult.length);
+        // console.log(' res.data.DashboardResult ',res.data.DashboardResult);
         setStationRows(res.data?.DashboardResult || []);
       }
       // setMinDate(startDate);
@@ -103,8 +103,6 @@ export default function CombinedDashboardModule({ activeFilter }) {
             <tr>
               <th colSpan="10" style={{ textAlign: 'center', fontSize: '18px', background: '#1e293b', color: '#fff', padding: '12px' }}>
                  Verification Dashboard 
-                <br />
-                 <p  style={{ fontSize: '12px', }}  >FROM 01.07.2026 TO 31.07.2026</p> 
               </th>
             </tr>
             {minDate || maxDate ? (

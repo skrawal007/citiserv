@@ -1,103 +1,5 @@
-// import React from "react";
 
-// export default function DateSearchHeader({
-//   title,
-//   showSearch,
-//   setShowSearch,
-//   sdate,
-//   setSdate,
-//   edate,
-//   setEdate,
-//   // handleSearchSubmit,
-// }) {
-
-//     function handleSearchSubmit(e) {
-//     e.preventDefault();
-//     if (!sdate || !edate) {
-//       alert('कृपया दोनों दिनांक भरें');
-//       return;
-//     }
-//     console.log("handaleSearchSubmti sdate ",sdate, " edate ", edate );
-//     // loadStationData(sdate, edate);
-//     setShowSearch(false);
-//   }
-
-//   return (
-//     <div className="module-container card-upgrade" style={{ padding: "20px" }}>
-//       <div
-//         className="module-header"
-//         style={{
-//           display: "flex",
-//           justifyContent: "space-between",
-//           alignItems: "center",
-//           marginBottom: "16px",
-//         }}
-//       >
-//         <div className="module-title-group">
-//           <h2
-//             style={{
-//               fontSize: "20px",
-//               color: "#1e293b",
-//               margin: 0,
-//             }}
-//           >
-//             {title}
-//           </h2>
-//         </div>
-
-//         <button
-//           className="search-trigger-btn"
-//           onClick={() => setShowSearch(true)}
-//         >
-//           🔍 दिनांक द्वारा खोजें
-//         </button>
-//       </div>
-
-//       {showSearch && (
-//         <div className="search-modal-overlay">
-//           <form className="search-form" onSubmit={handleSearchSubmit}>
-//             <h2>Search Records</h2>
-
-//             <div className="inputs">
-//               <label>From Date</label>
-
-//               <input
-//                 type="date"
-//                 value={sdate}
-//                 onChange={(e) => setSdate(e.target.value)}
-//               />
-//             </div>
-
-//             <div className="inputs">
-//               <label>
-//                 To Date <span style={{ color: "red" }}>*</span>
-//               </label>
-
-//               <input
-//                 type="date"
-//                 value={edate}
-//                 onChange={(e) => setEdate(e.target.value)}
-//                 required
-//               />
-//             </div>
-
-//             <div className="btn-container">
-//               <button type="submit">SEARCH</button>
-
-//               <button type="button" onClick={() => setShowSearch(false)}>
-//                 CLOSE
-//               </button>
-//             </div>
-//           </form>
-//         </div>
-//       )}
-//     </div>
-//   );
-// }
-
-
-
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 export default function DateSearchHeader({
   showSearch,
@@ -107,21 +9,78 @@ export default function DateSearchHeader({
   edate,
   setEdate,
 }) {
+  // Today's date in YYYY-MM-DD format
+  const getToday = () => {
+    const today = new Date();
+
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = getToday();
+
+  // Temporary values used inside modal
+  const [tempSdate, setTempSdate] = useState(sdate);
+  const [tempEdate, setTempEdate] = useState(edate);
+
+  const [dateError, setDateError] = useState("");
+
+  // When modal opens, copy parent values
+  useEffect(() => {
+    if (showSearch) {
+      setTempSdate(sdate);
+      setTempEdate(edate);
+      setDateError("");
+    }
+  }, [showSearch, sdate, edate]);
+
   function handleSearchSubmit(e) {
     e.preventDefault();
 
-    if (!sdate || !edate) {
-      alert("कृपया दोनों दिनांक भरें");
+    setDateError("");
+
+    // Required validation
+    if (!tempSdate || !tempEdate) {
+      setDateError("कृपया दोनों दिनांक भरें");
+      return;
+    }
+
+    // Future date validation
+    if (tempSdate > today) {
+      setDateError("From Date भविष्य की तारीख नहीं हो सकती");
+      return;
+    }
+
+    if (tempEdate > today) {
+      setDateError("To Date भविष्य की तारीख नहीं हो सकती");
+      return;
+    }
+
+    // From date cannot be greater than To date
+    if (tempSdate > tempEdate) {
+      setDateError("From Date, To Date से बड़ी नहीं हो सकती");
       return;
     }
 
     console.log(
       "handleSearchSubmit sdate:",
-      sdate,
+      tempSdate,
       "edate:",
-      edate
+      tempEdate
     );
 
+    // Update parent ONLY after successful SEARCH
+    setSdate(tempSdate);
+    setEdate(tempEdate);
+
+    setShowSearch(false);
+  }
+
+  function handleClose() {
+    setDateError("");
     setShowSearch(false);
   }
 
@@ -140,9 +99,6 @@ export default function DateSearchHeader({
         }}
       >
         <div className="module-title-group">
-      
-
-          {/* Date shown instead of the shield/title text */}
           <div
             style={{
               marginTop: "6px",
@@ -170,13 +126,33 @@ export default function DateSearchHeader({
           >
             <h2>Search Records</h2>
 
+            {/* Error message */}
+            {dateError && (
+              <div
+                style={{
+                  color: "#dc2626",
+                  background: "#fee2e2",
+                  padding: "10px",
+                  marginBottom: "15px",
+                  borderRadius: "6px",
+                  fontSize: "14px",
+                }}
+              >
+                ⚠️ {dateError}
+              </div>
+            )}
+
             <div className="inputs">
               <label>From Date</label>
 
               <input
                 type="date"
-                value={sdate}
-                onChange={(e) => setSdate(e.target.value)}
+                value={tempSdate}
+                max={today}
+                onChange={(e) => {
+                  setTempSdate(e.target.value);
+                  setDateError("");
+                }}
               />
             </div>
 
@@ -187,18 +163,24 @@ export default function DateSearchHeader({
 
               <input
                 type="date"
-                value={edate}
-                onChange={(e) => setEdate(e.target.value)}
+                value={tempEdate}
+                max={today}
+                onChange={(e) => {
+                  setTempEdate(e.target.value);
+                  setDateError("");
+                }}
                 required
               />
             </div>
 
             <div className="btn-container">
-              <button type="submit">SEARCH</button>
+              <button type="submit">
+                SEARCH
+              </button>
 
               <button
                 type="button"
-                onClick={() => setShowSearch(false)}
+                onClick={handleClose}
               >
                 CLOSE
               </button>

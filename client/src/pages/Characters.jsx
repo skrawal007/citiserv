@@ -4,7 +4,7 @@ import axios from 'axios';
 import Navbar from '../components/Navbar';
 import {formatDate} from '../utils/dataConvertor';
 import getAuthConfig from "../functions/getAuthConfig";
-
+import DateSearchHeader from "../components/dashboard/DateSearchHeader";
 
 
 const MODULE_NAMES = {
@@ -42,7 +42,13 @@ const hidePreAdd = (type) =>['complaint', 'postmortem'].includes(type);
 
 function fmt(d) { return d ? d.split('-').reverse().join('-') : ''; }
 
-export default function Characters() {
+export default function Characters({
+    showSearch,
+  setShowSearch,
+  sdate,
+  setSdate,
+  edate,
+  setEdate}) {
   const [searchParams] = useSearchParams();
   const loc = searchParams.get('loc');
   const type = searchParams.get('type');
@@ -63,7 +69,7 @@ useEffect(() => {
         throw new Error('Unsupported verification type');
       }
       const res = await axios.get(endpoint, {
-        params: { loc },
+        params: { loc,sdate,edate },
         ...getAuthConfig(),
       });
 
@@ -80,7 +86,7 @@ console.log("hidePreAdd " , hidePreAdd(type));
 
 
   fetchData();
-}, [loc, type]);
+}, [loc, type,sdate,edate]);
 
 
   const moduleName = MODULE_NAMES[type] || MODULE_NAMES.character;
@@ -90,11 +96,20 @@ console.log("hidePreAdd " , hidePreAdd(type));
   const hidePraAddCol = hidePraAdd(loc);
   const hidePreAddCol = hidePreAdd(type);
 
+
+
   return (
     <>
       <Navbar />
 
-
+    <DateSearchHeader
+            showSearch={showSearch}
+            setShowSearch={setShowSearch}
+            sdate={sdate}
+            setSdate={setSdate}
+            edate={edate}
+            setEdate={setEdate}
+              />
       <div className="table-wrapper">
         <table id="printable" ref={tableRef}>
           <thead>
