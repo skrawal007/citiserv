@@ -7,8 +7,8 @@ import { API_BASE } from '../../config/env';
 // request a second, potentially different dashboard snapshot.
 let initialDashboardRequest = null;
 
-function fetchCombinedDashboard(startDate = '', endDate = '') {
-  const isInitialLoad = !startDate && !endDate;
+function fetchCombinedDashboard(sdate, edate) {
+  const isInitialLoad = !sdate && !edate;
 
   if (isInitialLoad && initialDashboardRequest) {
     return initialDashboardRequest;
@@ -17,8 +17,8 @@ function fetchCombinedDashboard(startDate = '', endDate = '') {
   const request = axios.get(`${API_BASE}/combinedDashbaord`, {
     params: {
       type: 'combined',
-      sdate: startDate,
-      edate: endDate,
+      sdate: sdate,
+      edate: edate,
     },
   });
 
@@ -32,33 +32,31 @@ function fetchCombinedDashboard(startDate = '', endDate = '') {
   return request;
 }
 
-export default function CombinedDashboardModule({ activeFilter }) {
+export default function CombinedDashboardModule({ activeFilter, sdate, edate}) {
   const [stationRows, setStationRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [sdate, setSdate] = useState('');
-  const [edate, setEdate] = useState('');
   const [minDate, setMinDate] = useState('');
   const [maxDate, setMaxDate] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
   useEffect(() => {
-    loadStationData();
-  }, []);
+    loadStationData(sdate,edate);
+  }, [sdate,edate]);
 
-  async function loadStationData(startDate = '', endDate = '') {
+  async function loadStationData(sdate, edate) {
     setLoading(true);
     setError('');
     // console.log("activeFilter in charcter  filter ", activeFilter);
     try {
-      const res = await fetchCombinedDashboard(startDate, endDate);
+      const res = await fetchCombinedDashboard(sdate, edate);
       if (res.data && res.data.DashboardResult && res.data.DashboardResult.length > 0) {
         // console.log(' res.data.DashboardResult.length ', res.data.DashboardResult.length);
         // console.log(' res.data.DashboardResult ',res.data.DashboardResult);
         setStationRows(res.data?.DashboardResult || []);
       }
-      // setMinDate(startDate);
-      // setMaxDate(endDate);
+      // setMinDate(sdate);
+      // setMaxDate(edate);
     } catch (e) {
       console.warn('Using default station reference data:', e.message);
     } finally {
@@ -66,15 +64,15 @@ export default function CombinedDashboardModule({ activeFilter }) {
     }
   }
 
-  function handleSearchSubmit(e) {
-    e.preventDefault();
-    if (!sdate || !edate) {
-      alert('कृपया दोनों दिनांक भरें');
-      return;
-    }
-    loadStationData(sdate, edate);
-    setShowSearch(false);
-  }
+  // function handleSearchSubmit(e) {
+  //   e.preventDefault();
+  //   if (!sdate || !edate) {
+  //     alert('कृपया दोनों दिनांक भरें');
+  //     return;
+  //   }
+  //   loadStationData(sdate, edate);
+  //   setShowSearch(false);
+  // }
 
   function fmt(dateStr) {
     if (!dateStr) return '';

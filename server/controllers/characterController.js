@@ -12,6 +12,18 @@ const {
   makePlaceholders,
 } = require('../constants/statusConstants');
 
+
+const conditions = {
+      totaldcp: "pre_Current_Status ='DCP'",
+      totalliu: "pre_Current_Status LIKE '%LIU%'",
+      totalps: "pre_Current_Status LIKE '%PS%'",
+      totaldcrb: "pre_Current_Status LIKE '%DCRB%'",
+      totalremain: ` ((pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND per_Current_Status IS NULL)
+      OR( pre_Current_Status NOT IN ('APPROVED', 'REJECTED')  AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')))`,
+      totaldiff: `pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')`,
+      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+    };
+
 const characterList = async (req, res, next) => {
   try {
     console.log("Charcter list req.query ", req.query);
@@ -21,15 +33,7 @@ const characterList = async (req, res, next) => {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    const conditions = {
-      totaldcp: "pre_Current_Status IN ('DCP')",
-      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
-      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
-      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
-      totaldiff: 'pre_station_code <> per_station_code',
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
-    };
+    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
@@ -40,14 +44,14 @@ const characterList = async (req, res, next) => {
 
     const query =` SELECT characters.* FROM characters 
       JOIN station_ ON station_.code = characters.${stationColumn}
-      JOIN user_station ON user_station.station_id = station_.id
+    -- JOIN user_station ON user_station.station_id = station_.id
       JOIN district_ ON district_.code = station_.district_code
       JOIN user_district ON user_district.district_id= district_.id
       WHERE  ${condition} 
       AND user_district.user_id = ? AND request_date BETWEEN ? AND ? 
       ORDER BY pre_station_name, request_date;`;
 
-    // console.log(mysql.format(query,[req.user.userid]));
+    console.log(mysql.format(query,[req.user.userid,sdate,edate]));
 
       const [rows] = await pool.execute(query, [userid, sdate,edate]);
 
@@ -67,15 +71,7 @@ const employeeList = async (req, res, next) => {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    const conditions = {
-      totaldcp: "pre_Current_Status IN ('DCP')",
-      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
-      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
-      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
-      totaldiff: 'pre_station_code <> per_station_code',
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
-    };
+    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
@@ -117,15 +113,6 @@ const tenantList = async (req, res, next) => {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    const conditions = {
-      totaldcp: "pre_Current_Status IN ('DCP')",
-      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
-      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
-      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
-      totaldiff: 'pre_station_code <> per_station_code',
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
-    };
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
@@ -165,15 +152,7 @@ const domesticList = async (req, res, next) => {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    const conditions = {
-      totaldcp: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP', 'DCP')",
-      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
-      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
-      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
-      totaldiff: 'pre_station_code <> per_station_code',
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
-    };
+    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
@@ -214,15 +193,11 @@ const complaintList = async (req, res, next) => {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    const conditions = {
-      totaldcp: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP', 'DCP')",
-      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
-      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
-      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
-      totaldiff: 'pre_station_code <> per_station_code',
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+        const conditions = {
+      totaldcp: "pre_Current_Status ='DCP'",
+      totalremain: `pre_Current_Status  NOT IN ('FINISHED', 'REJECTED')`,
     };
+    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
@@ -248,7 +223,7 @@ const complaintList = async (req, res, next) => {
           WHERE ${condition} AND user_district.user_id = ?
           ORDER BY  request_date;`;
         
-  // console.log(mysql.format(query));
+   console.log(mysql.format(query,[userid]));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -270,22 +245,20 @@ const postmortemList = async (req, res, next) => {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
+    
+
+
     const conditions = {
-      totaldcp: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP', 'DCP')",
-      totalliu: "pre_Current_Status IN ('PS/DCRB/LIU/DCP')",
-      totalps: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCP', 'PS/DCRB/LIU/DCP')",
-      totaldcrb: "pre_Current_Status IN ('PS/DCRB/DCP', 'PS/DCRB/LIU/DCP')",
-      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND  pre_Current_Status <> ''",
-      totaldiff: 'pre_station_code <> per_station_code',
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+      totaldcp: "pre_Current_Status ='DCP'",
+      totalremain: `pre_Current_Status  NOT IN ('APPROVED', 'REJECTED')`,
     };
+
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
   
     const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
-
 
 
     const query =`
@@ -304,7 +277,7 @@ const postmortemList = async (req, res, next) => {
           WHERE ${condition} AND user_district.user_id = ?
           ORDER BY  request_date;`;
         
-   //console.log(mysql.format(query));
+  //  console.log(mysql.format(query, [userid]));
 
     const [rows] = await pool.execute(query,[userid]);
 
@@ -315,221 +288,648 @@ const postmortemList = async (req, res, next) => {
   }
 };
 
+
 const Dashboard = async (req, res, next) => {
   console.log('Dashboard request received with query:', req.query);
-  // console.log("TOKEN USER DATA:", req.user);
+
   try {
     const { type, sdate, edate } = req.query;
-    const { userid, username, usertype } = req.user;
-    let tableType ;
-    if(type ==='employee'){
-      tableType ='employees'
-    }else if(type ==='character'){
-      tableType = 'characters'
-    } else if( type === 'tenant'){
-      tableType = 'tenants';
-    } else if (type === 'domestic'){
-      tableType ='domestic'
-    } else {
-          res.json({
-      stationRows:   [],
-      agingSummary: [],
-    });
-    return;
+    const { userid } = req.user;
+
+    // ---------------------------------------------------------
+    // 1. Validate / select table
+    // ---------------------------------------------------------
+    const tableMap = {
+      employee: 'employees',
+      character: 'characters',
+      tenant: 'tenants',
+      domestic: 'domestic'
+    };
+
+    const tableType = tableMap[type];
+
+    if (!tableType) {
+      return res.json({
+        stationRows: []
+      });
     }
-    let dateCondtion='';
 
-    if(sdate && edate){
-     dateCondtion =`AND request_date BETWEEN '${sdate}' AND '${edate}'`;
+    // ---------------------------------------------------------
+    // 2. Date condition
+    // ---------------------------------------------------------
+    //
+    // If request_date is DATETIME:
+    //
+    // >= sdate
+    // < edate + 1 day
+    //
+    // This includes the complete end date.
+    //
+    let dateCondition = '';
+    let dateParams = [];
+
+    if (sdate && edate) {
+      dateCondition = `
+        AND t.request_date >= ?
+        AND t.request_date < DATE_ADD(?, INTERVAL 1 DAY)
+      `;
+
+      dateParams = [sdate, edate];
     }
-   let query =`SELECT
-    p.pre_station_name,
-    p.pre_station_code,
-    p.request_count,
-    p.approved_count,
-    p.rejected_count,
-    p.pending_count,
-    p.pending_ps_count,
-    p.pending_dcrb_count,
-    p.pending_liu_count,
-    p.pending_dcp_count,
-    p.own_to_other,
-    COALESCE(o.other_to_own, 0) AS other_to_own
-FROM
-(
-    SELECT
-        pre_station_name,
-        pre_station_code,
-        COUNT(*) AS request_count,
 
-        SUM(pre_Current_Status LIKE '%APPROVED%') AS approved_count,
-        SUM(pre_Current_Status LIKE '%REJECTED%') AS rejected_count,
+    // ---------------------------------------------------------
+    // 3. Main SQL
+    // ---------------------------------------------------------
+    //
+    // user_stations = MASTER station list
+    //
+    // This is the important part.
+    //
+    // We start from ALL stations belonging to the user's
+    // district and LEFT JOIN the transaction counts.
+    //
+    // Therefore:
+    //
+    // Station with records     -> counts
+    // Station without records  -> 0
+    //
+    const query = `
+      WITH user_stations AS (
 
-        COUNT(*)
-        - SUM(pre_Current_Status LIKE '%APPROVED%')
-        - SUM(pre_Current_Status LIKE '%REJECTED%') AS pending_count,
+        SELECT DISTINCT
+          s.name AS pre_station_name,
+          s.code AS pre_station_code
 
-        SUM(pre_Current_Status LIKE '%PS%')   AS pending_ps_count,
-        SUM(pre_Current_Status LIKE '%DCRB%') AS pending_dcrb_count,
-        SUM(pre_Current_Status LIKE '%LIU%')  AS pending_liu_count,
-        SUM(pre_Current_Status LIKE '%DCP%')  AS pending_dcp_count,
+        FROM station_ s
 
-SUM(
-    CASE
-        WHEN per_Current_Status IS NOT NULL
-         AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')
-        THEN 1
-        ELSE 0
-    END
-) AS own_to_other
-    FROM ${tableType} 
-    JOIN station_ ON station_.code = ${tableType}.pre_station_code
-    JOIN district_ ON district_.code = station_.district_code
-    JOIN user_district ud ON ud.district_id = district_.id
-    WHERE ud.user_id = ? ${dateCondtion}
-    GROUP BY pre_station_name,pre_station_code
-) p
-LEFT JOIN
-(
-    SELECT
-        per_station_code,
-        COUNT(*) AS other_to_own
-    FROM ${tableType} 
-	JOIN station_ ON station_.code = ${tableType}.pre_station_code
-    JOIN district_ ON district_.code = station_.district_code
-    JOIN user_district ud ON ud.district_id = district_.id
-    WHERE ud.user_id = ? AND per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code
-    GROUP BY per_station_code
-) o ON p.pre_station_code = o.per_station_code
-ORDER BY p.pre_station_name`;
+        INNER JOIN district_ d
+          ON d.code = s.district_code
 
-    const [stationRows] = await pool.execute(query,[userid,userid]);
+        INNER JOIN user_district ud
+          ON ud.district_id = d.id
 
-         console.log(mysql.format(query,[userid,userid]));
+        WHERE ud.user_id = ?
 
-    const agingSummary = await fetchAgingSummary(sdate, edate);
+      ),
 
-    res.json({
-      stationRows: stationRows || [],
-      agingSummary: agingSummary || [],
+      outgoing AS (
+
+        SELECT
+          t.pre_station_code,
+
+          COUNT(*) AS request_count,
+
+          /* APPROVED */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status LIKE '%APPROVED%'
+              THEN 1
+              ELSE 0
+            END
+          ) AS approved_count,
+
+          /* REJECTED */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status LIKE '%REJECTED%'
+              THEN 1
+              ELSE 0
+            END
+          ) AS rejected_count,
+
+          /* PENDING */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status IS NULL
+                OR (
+                  t.pre_Current_Status NOT LIKE '%APPROVED%'
+                  AND t.pre_Current_Status NOT LIKE '%REJECTED%'
+                )
+              THEN 1
+              ELSE 0
+            END
+          ) AS pending_count,
+
+          /* PENDING PS */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status LIKE '%PS%'
+              THEN 1
+              ELSE 0
+            END
+          ) AS pending_ps_count,
+
+          /* PENDING DCRB */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status LIKE '%DCRB%'
+              THEN 1
+              ELSE 0
+            END
+          ) AS pending_dcrb_count,
+
+          /* PENDING LIU */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status LIKE '%LIU%'
+              THEN 1
+              ELSE 0
+            END
+          ) AS pending_liu_count,
+
+          /* PENDING DCP */
+          SUM(
+            CASE
+              WHEN t.pre_Current_Status = 'DCP'
+              THEN 1
+              ELSE 0
+            END
+          ) AS pending_dcp_count,
+
+          /*
+           * OWN -> OTHER
+           *
+           * Request originated at this station
+           * and moved to another station.
+           */
+          SUM(
+            CASE
+              WHEN t.per_Current_Status IS NOT NULL
+                AND t.per_Current_Status NOT IN (
+                  'APPROVED',
+                  'REJECTED'
+                )
+                AND t.pre_station_code IS NOT NULL
+                AND t.per_station_code IS NOT NULL
+                AND t.pre_station_code <> t.per_station_code
+              THEN 1
+              ELSE 0
+            END
+          ) AS own_to_other
+
+        FROM ${tableType} t
+
+        WHERE 1 = 1
+
+        ${dateCondition}
+
+        GROUP BY
+          t.pre_station_code
+
+      ),
+
+      incoming AS (
+
+        SELECT
+          t.per_station_code,
+
+          /*
+           * OTHER -> OWN
+           *
+           * Request came from another station
+           * and is currently pending at this station.
+           */
+          COUNT(*) AS other_to_own
+
+        FROM ${tableType} t
+
+        WHERE t.per_Current_Status IS NOT NULL
+
+          AND t.per_Current_Status NOT IN (
+            'APPROVED',
+            'REJECTED'
+          )
+
+          AND t.pre_station_code IS NOT NULL
+
+          AND t.per_station_code IS NOT NULL
+
+          AND t.pre_station_code <> t.per_station_code
+
+          ${dateCondition}
+
+        GROUP BY
+          t.per_station_code
+
+      )
+
+      SELECT
+
+        /* Station information */
+        us.pre_station_name,
+        us.pre_station_code,
+
+        /* Outgoing */
+        COALESCE(o.request_count, 0) AS request_count,
+
+        COALESCE(o.approved_count, 0) AS approved_count,
+
+        COALESCE(o.rejected_count, 0) AS rejected_count,
+
+        COALESCE(o.pending_count, 0) AS pending_count,
+
+        COALESCE(o.pending_ps_count, 0) AS pending_ps_count,
+
+        COALESCE(o.pending_dcrb_count, 0) AS pending_dcrb_count,
+
+        COALESCE(o.pending_liu_count, 0) AS pending_liu_count,
+
+        COALESCE(o.pending_dcp_count, 0) AS pending_dcp_count,
+
+        COALESCE(o.own_to_other, 0) AS own_to_other,
+
+        /* Incoming */
+        COALESCE(i.other_to_own, 0) AS other_to_own
+
+      FROM user_stations us
+
+      LEFT JOIN outgoing o
+        ON o.pre_station_code = us.pre_station_code
+
+      LEFT JOIN incoming i
+        ON i.per_station_code = us.pre_station_code
+
+      ORDER BY
+        us.pre_station_name
+    `;
+
+    // ---------------------------------------------------------
+    // 4. Query parameters
+    // ---------------------------------------------------------
+    //
+    // user_stations:
+    //     1 parameter
+    //
+    // outgoing:
+    //     sdate
+    //     edate
+    //
+    // incoming:
+    //     sdate
+    //     edate
+    //
+    const params = [
+      userid,
+      ...dateParams,
+      ...dateParams
+    ];
+
+    // console.log(
+    //   'Dashboard SQL:',
+    //   mysql.format(query, params)
+    // );
+
+    // ---------------------------------------------------------
+    // 5. Execute query
+    // ---------------------------------------------------------
+    const [stationRows] = await pool.execute(
+      query,
+      params
+    );
+
+    // ---------------------------------------------------------
+    // 6. Create TOTAL row
+    // ---------------------------------------------------------
+    const totalRow = {
+      pre_station_name: 'TOTAL',
+      isTotal: true,
+      pre_station_code: null,
+
+      request_count: 0,
+      approved_count: 0,
+      rejected_count: 0,
+      pending_count: 0,
+
+      pending_ps_count: 0,
+      pending_dcrb_count: 0,
+      pending_liu_count: 0,
+      pending_dcp_count: 0,
+
+      own_to_other: 0,
+      other_to_own: 0
+    };
+
+    // ---------------------------------------------------------
+    // 7. Calculate totals
+    // ---------------------------------------------------------
+    stationRows.forEach((row) => {
+
+      totalRow.request_count += Number(
+        row.request_count || 0
+      );
+
+      totalRow.approved_count += Number(
+        row.approved_count || 0
+      );
+
+      totalRow.rejected_count += Number(
+        row.rejected_count || 0
+      );
+
+      totalRow.pending_count += Number(
+        row.pending_count || 0
+      );
+
+      totalRow.pending_ps_count += Number(
+        row.pending_ps_count || 0
+      );
+
+      totalRow.pending_dcrb_count += Number(
+        row.pending_dcrb_count || 0
+      );
+
+      totalRow.pending_liu_count += Number(
+        row.pending_liu_count || 0
+      );
+
+      totalRow.pending_dcp_count += Number(
+        row.pending_dcp_count || 0
+      );
+
+      totalRow.own_to_other += Number(
+        row.own_to_other || 0
+      );
+
+      totalRow.other_to_own += Number(
+        row.other_to_own || 0
+      );
     });
+
+    // ---------------------------------------------------------
+    // 8. Add TOTAL at bottom
+    // ---------------------------------------------------------
+    stationRows.push(totalRow);
+
+    // ---------------------------------------------------------
+    // 9. Response
+    // ---------------------------------------------------------
+    return res.json({
+      stationRows
+    });
+
   } catch (err) {
+    console.error(
+      'Dashboard Error:',
+      err
+    );
+
     next(err);
   }
 };
 
 const combinedDashbaord = async (req, res, next) => {
-  console.log('Dashboard request received with query:', req.query);
+  console.log('Combined Dashboard request received with query:', req.query);
   // console.log("TOKEN USER DATA:", req.user);
   try{
 
-    // const { type, sdate, edate } = req.query;
+    const { type, sdate, edate } = req.query;
     const { userid } = req.user;
+    
+let query =`WITH verification_types AS (
+    SELECT 'Tenants' AS verification_type
+    UNION ALL
+    SELECT 'Employee'
+    UNION ALL
+    SELECT 'Character'
+    UNION ALL
+    SELECT 'Domestic'
+),
 
-    // const { userid, username, usertype } = req.user;
-
-    console.log( typeof userid);
-   let  query=`WITH verification_records AS (
-    SELECT 'Tenants' AS verification_type,
-           pre_district_code,
-           per_district_code,
-           pre_Current_Status,
-           per_Current_Status
+verification_records AS (
+    SELECT
+        'Tenants' AS verification_type,
+        request_date,
+        pre_district_code,
+        per_district_code,
+        pre_Current_Status,
+        per_Current_Status
     FROM tenants
 
     UNION ALL
 
-    SELECT 'Employee' AS verification_type,
-           pre_district_code,
-           per_district_code,
-           pre_Current_Status,
-           per_Current_Status
+    SELECT
+        'Employee' AS verification_type,
+        request_date,
+        pre_district_code,
+        per_district_code,
+        pre_Current_Status,
+        per_Current_Status
     FROM employees
 
     UNION ALL
 
-    SELECT 'Character' AS verification_type,
-           pre_district_code,
-           per_district_code,
-           pre_Current_Status,
-           per_Current_Status
+    SELECT
+        'Character' AS verification_type,
+        request_date,
+        pre_district_code,
+        per_district_code,
+        pre_Current_Status,
+        per_Current_Status
     FROM characters
 
     UNION ALL
 
-    SELECT 'Domestic' AS verification_type,
-           pre_district_code,
-           per_district_code,
-           pre_Current_Status,
-           per_Current_Status
+    SELECT
+        'Domestic' AS verification_type,
+        request_date,
+        pre_district_code,
+        per_district_code,
+        pre_Current_Status,
+        per_Current_Status
     FROM domestic
 ),
+
 outgoing AS (
     SELECT
         vr.verification_type,
+
         COUNT(*) AS request_count,
 
-        SUM(CASE WHEN vr.pre_Current_Status LIKE '%APPROVED%' THEN 1 ELSE 0 END) AS approved_count,
-        SUM(CASE WHEN vr.pre_Current_Status LIKE '%REJECTED%' THEN 1 ELSE 0 END) AS rejected_count,
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status LIKE '%APPROVED%'
+                THEN 1 ELSE 0
+            END
+        ) AS approved_count,
 
-        SUM(CASE
-            WHEN vr.pre_Current_Status IS NULL
-              OR (
-                vr.pre_Current_Status NOT LIKE '%APPROVED%'
-                AND vr.pre_Current_Status NOT LIKE '%REJECTED%'
-              )
-            THEN 1 ELSE 0
-        END) AS pending_count,
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status LIKE '%REJECTED%'
+                THEN 1 ELSE 0
+            END
+        ) AS rejected_count,
 
-        SUM(CASE WHEN vr.pre_Current_Status LIKE '%PS%' THEN 1 ELSE 0 END) AS pending_ps_count,
-        SUM(CASE WHEN vr.pre_Current_Status LIKE '%DCRB%' THEN 1 ELSE 0 END) AS pending_dcrb_count,
-        SUM(CASE WHEN vr.pre_Current_Status LIKE '%LIU%' THEN 1 ELSE 0 END) AS pending_liu_count,
-        SUM(CASE WHEN vr.pre_Current_Status LIKE '%DCP%' THEN 1 ELSE 0 END) AS pending_dcp_count,
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status IS NULL
+                  OR (
+                    vr.pre_Current_Status NOT LIKE '%APPROVED%'
+                    AND vr.pre_Current_Status NOT LIKE '%REJECTED%'
+                  )
+                THEN 1 ELSE 0
+            END
+        ) AS pending_count,
 
-        SUM(CASE
-            WHEN vr.per_Current_Status IS NOT NULL
-             AND vr.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
-             AND vr.pre_district_code <> vr.per_district_code
-            THEN 1 ELSE 0
-        END) AS own_to_other
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status LIKE '%PS%'
+                THEN 1 ELSE 0
+            END
+        ) AS pending_ps_count,
+
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status LIKE '%DCRB%'
+                THEN 1 ELSE 0
+            END
+        ) AS pending_dcrb_count,
+
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status LIKE '%LIU%'
+                THEN 1 ELSE 0
+            END
+        ) AS pending_liu_count,
+
+        SUM(
+            CASE
+                WHEN vr.pre_Current_Status = 'DCP'
+                THEN 1 ELSE 0
+            END
+        ) AS pending_dcp_count,
+
+        SUM(
+            CASE
+                WHEN vr.per_Current_Status IS NOT NULL
+                 AND vr.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
+                 AND vr.pre_district_code <> vr.per_district_code
+                THEN 1 ELSE 0
+            END
+        ) AS own_to_other
+
     FROM verification_records vr
-    JOIN district_ d ON d.code = vr.pre_district_code
-    JOIN user_district ud ON ud.district_id = d.id
+
+    JOIN district_ d
+        ON d.code = vr.pre_district_code
+
+    JOIN user_district ud
+        ON ud.district_id = d.id
+
     WHERE ud.user_id = ?
+      AND vr.request_date >= ?
+      AND vr.request_date < ?
+
     GROUP BY vr.verification_type
 ),
+
 incoming AS (
     SELECT
         vr.verification_type,
+
         COUNT(*) AS other_to_own
+
     FROM verification_records vr
-    JOIN district_ d ON d.code = vr.per_district_code
-    JOIN user_district ud ON ud.district_id = d.id
+
+    JOIN district_ d
+        ON d.code = vr.per_district_code
+
+    JOIN user_district ud
+        ON ud.district_id = d.id
+
     WHERE ud.user_id = ?
+
+      AND vr.request_date >= ?
+      AND vr.request_date < ?
+
       AND vr.per_Current_Status IS NOT NULL
-      AND vr.per_Current_Status NOT IN ('APPROVED', 'REJECTED')
+
+      AND vr.per_Current_Status NOT IN (
+          'APPROVED',
+          'REJECTED'
+      )
+
       AND vr.pre_district_code <> vr.per_district_code
+
     GROUP BY vr.verification_type
 )
-SELECT
-    o.verification_type,
-    o.request_count,
-    o.approved_count,
-    o.rejected_count,
-    o.pending_count,
-    o.pending_ps_count,
-    o.pending_dcrb_count,
-    o.pending_liu_count,
-    o.pending_dcp_count,
-    o.own_to_other,
-    COALESCE(i.other_to_own, 0) AS other_to_own
-FROM outgoing o
-LEFT JOIN incoming i
-    ON i.verification_type = o.verification_type
-ORDER BY o.verification_type;`;
 
-    const [result] = await pool.execute(query, [userid, userid]);
-    console.log('Combined dashboard result length:', result.length);
+SELECT
+    vt.verification_type,
+
+    COALESCE(o.request_count, 0) AS request_count,
+    COALESCE(o.approved_count, 0) AS approved_count,
+    COALESCE(o.rejected_count, 0) AS rejected_count,
+    COALESCE(o.pending_count, 0) AS pending_count,
+    COALESCE(o.pending_ps_count, 0) AS pending_ps_count,
+    COALESCE(o.pending_dcrb_count, 0) AS pending_dcrb_count,
+    COALESCE(o.pending_liu_count, 0) AS pending_liu_count,
+    COALESCE(o.pending_dcp_count, 0) AS pending_dcp_count,
+    COALESCE(o.own_to_other, 0) AS own_to_other,
+    COALESCE(i.other_to_own, 0) AS other_to_own
+
+FROM verification_types vt
+
+LEFT JOIN outgoing o
+    ON o.verification_type = vt.verification_type
+
+LEFT JOIN incoming i
+    ON i.verification_type = vt.verification_type
+
+ORDER BY
+    vt.verification_type`;
+
+// console.log(mysql.format(query, [ userid,
+//   sdate,
+//   edate,
+//   userid,
+//   sdate,
+//   edate]));    
+
+const [result] = await pool.execute(query, [  
+  userid,
+  sdate,
+  edate,
+  userid,
+  sdate,
+  edate]);
+    
+
+
+
+// Calculate total row
+const totalRow = {
+  verification_type : "TOTAL",
+  isTotal: true,
+  pre_station_code: null,
+  request_count: 0,
+  approved_count: 0,
+  rejected_count: 0,
+  pending_count: 0,
+  pending_ps_count: 0,
+  pending_dcrb_count: 0,
+  pending_liu_count: 0,
+  pending_dcp_count: 0,
+  own_to_other: 0,
+  other_to_own: 0,
+};
+
+// Sum every numeric column
+result.forEach((row) => {
+  totalRow.request_count += Number(row.request_count || 0);
+  totalRow.approved_count += Number(row.approved_count || 0);
+  totalRow.rejected_count += Number(row.rejected_count || 0);
+  totalRow.pending_count += Number(row.pending_count || 0);
+  totalRow.pending_ps_count += Number(row.pending_ps_count || 0);
+  totalRow.pending_dcrb_count += Number(row.pending_dcrb_count || 0);
+  totalRow.pending_liu_count += Number(row.pending_liu_count || 0);
+  totalRow.pending_dcp_count += Number(row.pending_dcp_count || 0);
+  totalRow.own_to_other += Number(row.own_to_other || 0);
+  totalRow.other_to_own += Number(row.other_to_own || 0);
+});
+
+// Add total row at the end
+result.push(totalRow);
+
 
     res.json({
         DashboardResult : result
@@ -540,6 +940,167 @@ ORDER BY o.verification_type;`;
     next(err);
   }
 
+}
+const PendingDurationSummary= async(req,res,next)=>{
+console.log(" you called PendingDurationSummary .........");
+   
+try{
+   const { userid } = req.user;
+   console.log("userid ", userid);
+  
+   const query = `SELECT
+    ROW_NUMBER() OVER (ORDER BY ApplicationType) AS SNo,
+    ApplicationType,
+
+    COUNT(request_number) AS Total,
+
+    SUM(CASE
+        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15
+        THEN 1 ELSE 0
+    END) AS Within15Days,
+
+    SUM(CASE
+        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30
+        THEN 1 ELSE 0
+    END) AS Between16To30Days,
+
+    SUM(CASE
+        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90
+        THEN 1 ELSE 0
+    END) AS Between31To90Days,
+
+    SUM(CASE
+        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180
+        THEN 1 ELSE 0
+    END) AS Between91To180Days,
+
+    SUM(CASE
+        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365
+        THEN 1 ELSE 0
+    END) AS Between181To365Days,
+
+    SUM(CASE
+        WHEN DATEDIFF(CURDATE(), request_date) > 365
+        THEN 1 ELSE 0
+    END) AS Above01Year
+
+FROM (
+
+    SELECT
+        request_number,
+        request_date,
+        pre_Current_Status,
+        per_Current_Status,
+        pre_station_code,
+        'Character' AS ApplicationType
+    FROM characters
+
+    UNION ALL
+
+    SELECT
+        request_number,
+        request_date,
+        pre_Current_Status,
+        per_Current_Status,
+        pre_station_code,
+        'Employee' AS ApplicationType
+    FROM employees
+
+    UNION ALL
+
+    SELECT
+        request_number,
+        request_date,
+        pre_Current_Status,
+        per_Current_Status,
+        pre_station_code,
+        'Tenant' AS ApplicationType
+    FROM tenants
+
+    UNION ALL
+
+    SELECT
+        request_number,
+        request_date,
+        pre_Current_Status,
+        per_Current_Status,
+        pre_station_code,
+        'Domestic' AS ApplicationType
+    FROM domestic
+
+) AS applications
+
+JOIN station_
+    ON station_.code = applications.pre_station_code
+
+JOIN district_
+    ON district_.code = station_.district_code
+
+JOIN user_district ud
+    ON ud.district_id = district_.id
+
+WHERE ud.user_id = 10074
+
+  AND (
+      applications.pre_Current_Status IS NULL
+      OR UPPER(TRIM(applications.pre_Current_Status))
+         NOT IN ('APPROVED', 'REJECTED')
+  )
+
+  AND (
+      applications.per_Current_Status IS NULL
+      OR UPPER(TRIM(applications.per_Current_Status))
+         NOT IN ('APPROVED', 'REJECTED')
+  )
+
+GROUP BY ApplicationType
+
+ORDER BY ApplicationType`;
+
+const [result] = await pool.execute(query);
+
+// Calculate total row
+const totalRow = {
+  ApplicationType : "TOTAL",
+  isTotal: true,
+  Total: 0,
+  Within15Days: 0,
+  Between16To30Days: 0,
+  Between31To90Days: 0,
+  Between91To180Days: 0,
+  Between181To365Days: 0,
+  Above01Year: 0,
+};
+
+// Sum every numeric column
+result.forEach((row) => {
+  totalRow.Total += Number(row.Total || 0);
+  totalRow.Within15Days += Number(row.Within15Days || 0);
+  totalRow.Between16To30Days += Number(row.Between16To30Days || 0);
+  totalRow.Between31To90Days += Number(row.Between31To90Days || 0);
+  totalRow.Between91To180Days += Number(row.Between91To180Days || 0);
+  totalRow.Between181To365Days += Number(row.Between181To365Days || 0);
+  totalRow.Above01Year += Number(row.Above01Year || 0);
+});
+
+// Add total row at the end
+result.push(totalRow);
+
+
+
+
+return res.json({
+      result: result
+    });
+
+  } catch (err) {
+    console.error(
+      'Dashboard Error:',
+      err
+    );
+
+    next(err);
+  }
 }
 
 // login ps name and  ps code
@@ -944,6 +1505,7 @@ module.exports = {
   getMinDate,
   getMaxDate,
   Dashboard,
+  PendingDurationSummary,
   combinedDashbaord,
   getDashboardByDate,
   getPending,

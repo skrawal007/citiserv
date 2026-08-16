@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE } from '../../config/env';
-
 export default function CharacterModule({ activeFilter,activeModule, sdate, edate }) {
   const [stationRows, setStationRows] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +15,6 @@ export default function CharacterModule({ activeFilter,activeModule, sdate, edat
   async function loadStationData() {
     setLoading(true);
     setError('');
-    console.log("activeFilter in charcter  filter ", activeFilter);
     try {
       const res = await axios.get(`${API_BASE}/dashboard`, {
         params: {
@@ -27,7 +25,7 @@ export default function CharacterModule({ activeFilter,activeModule, sdate, edat
       });
       if (res.data && res.data.stationRows && res.data.stationRows.length > 0) {
         setStationRows(res.data.stationRows);
-        console.log("res.data.stationRows ",res.data.stationRows);
+        // console.log("res.data.stationRows ",res.data.stationRows);
       }
     } catch (e) {
       console.warn('Using default station reference data:', e.message);
@@ -35,7 +33,6 @@ export default function CharacterModule({ activeFilter,activeModule, sdate, edat
       setLoading(false);
     }
   }
-
 
 
   // Highlight classes based on selected dropdown options (activeFilter)

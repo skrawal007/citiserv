@@ -7,6 +7,7 @@ const {
   getMaxDate,
   Dashboard,
   combinedDashbaord,
+  PendingDurationSummary,
   getDashboardByDate,
   getPending,
   getDetails,
@@ -32,6 +33,7 @@ router.get('/dashboard', authMiddleware,Dashboard);
 router.get('/combinedDashbaord', authMiddleware, combinedDashbaord);
 router.post('/dashboard', authMiddleware,getDashboardByDate);
 router.get('/pending', authMiddleware, getPending);
+router.get('/PendingDurationSummary', authMiddleware,PendingDurationSummary);
 router.get('/characterList', authMiddleware, characterList);
 router.get('/employeeList', authMiddleware, employeeList);
 router.get('/tenantList', authMiddleware, tenantList);

@@ -216,12 +216,9 @@ export default function Dashboard({
 
               {!loading && !error && (
                 <>
-                  <CombinedDashboardModule activeFilter={activeFilter} />
+                  <CombinedDashboardModule activeFilter={activeFilter}   sdate={sdate} edate={edate}/>
 
-                  <AgingSummaryTable
-                    agingRows={agingRows}
-                    agingTotals={agingTotals}
-                  />
+                  <AgingSummaryTable/>
                 </>
               )}
             </>

@@ -1,9 +1,45 @@
-import React from 'react';
+import React, { useState, useEffect }from 'react';
+import axios from 'axios';
+import { API_BASE } from '../../config/env';
 import { Link } from 'react-router-dom';
 
-export default function AgingSummaryTable({ agingRows, agingTotals }) {
+export default function AgingSummaryTable() {
+  
+    const [stationRows, setStationRows] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
+    
   const detailLink = (typeKey, daysRange) =>
     `/characters?type=${typeKey}&days=${daysRange}`;
+
+
+    useEffect(() => {
+    loadStationData();
+  }, []);
+
+  async function loadStationData() {
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.get(`${API_BASE}/PendingDurationSummary`);
+     
+      // console.log(res.data.data);
+     
+      if (res.data.result && res.data.result && res.data.result.length > 0) {
+        setStationRows(res.data.result);
+        // console.log("res.data.result ",res.data.result);
+      }
+    } catch (e) {
+      console.warn('Using default station reference data:', e.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+
+
+
+
 
   return (
     <div className="table-wrapper image-styled-table-wrapper card-upgrade">
@@ -15,6 +51,7 @@ export default function AgingSummaryTable({ agingRows, agingTotals }) {
           <tr>
             <th className="th-sno">SNo.</th>
             <th className="th-app-type">Application Type</th>
+            <th>Total Pending </th>
             <th>Within 15 days</th>
             <th>Between 16 to 30 days</th>
             <th>Between 31 to 90 days</th>
@@ -25,44 +62,35 @@ export default function AgingSummaryTable({ agingRows, agingTotals }) {
         </thead>
 
         <tbody>
-          {agingRows.map((r, i) => (
+          {stationRows.map((r, i) => (
             <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
               <td className="td-sno">{r.sno || i + 1}</td>
-              <td className="td-app-type">{r.label || r.app_type}</td>
+              <td className="td-app-type">{r.ApplicationType}</td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey || 'character', '15')} className="count-link">{r.d15}</Link>
+                <Link to={detailLink(r.typeKey )} className="count-link">{r.Total}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey || 'character', '30')} className="count-link">{r.d30}</Link>
+                <Link to={detailLink(r.typeKey )} className="count-link">{r.Within15Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey || 'character', '90')} className="count-link">{r.d90}</Link>
+                <Link to={detailLink(r.typeKey )} className="count-link">{r.Between16To30Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey || 'character', '180')} className="count-link">{r.d180}</Link>
+                <Link to={detailLink(r.typeKey )} className="count-link">{r.Between31To90Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey || 'character', '365')} className="count-link">{r.d365}</Link>
+                <Link to={detailLink(r.typeKey)} className="count-link">{r.Between91To180Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey || 'character', 'above1')} className="count-link">{r.dAbove1}</Link>
+                <Link to={detailLink(r.typeKey)} className="count-link">{r.Between181To365Days}</Link>
+              </td>
+              <td className="td-count">
+                <Link to={detailLink(r.typeKey)} className="count-link">{r.Above01Year}</Link>
               </td>
             </tr>
           ))}
         </tbody>
 
-        <tfoot>
-          <tr className="total-row">
-            <td className="td-sno"></td>
-            <td className="td-total-label">कुल</td>
-            <td className="td-total-val">{agingTotals.d15}</td>
-            <td className="td-total-val">{agingTotals.d30}</td>
-            <td className="td-total-val">{agingTotals.d90}</td>
-            <td className="td-total-val">{agingTotals.d180}</td>
-            <td className="td-total-val">{agingTotals.d365}</td>
-            <td className="td-total-val">{agingTotals.dAbove1}</td>
-          </tr>
-        </tfoot>
       </table>
     </div>
   );

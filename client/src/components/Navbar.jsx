@@ -67,15 +67,16 @@ export default function Navbar() {
               <li className={isDashboardActive && currentType === 'character' ? 'active-sub' : ''}>
                 <Link to="/dashboard?type=character">🛡️ Character (चरित्र)</Link>
               </li>
+                 <li className={isDashboardActive && currentType === 'domestic' ? 'active-sub' : ''}>
+                <Link to="/dashboard?type=domestic">🧹 Domestic (घरेलू)</Link>
+              </li>
               <li className={isDashboardActive && currentType === 'employee' ? 'active-sub' : ''}>
                 <Link to="/dashboard?type=employee">💼 Employee (कर्मचारी)</Link>
               </li>
               <li className={isDashboardActive && currentType === 'tenant' ? 'active-sub' : ''}>
                 <Link to="/dashboard?type=tenant">🏠 Tenant (किरायेदार)</Link>
               </li>
-              <li className={isDashboardActive && currentType === 'domestic' ? 'active-sub' : ''}>
-                <Link to="/dashboard?type=domestic">🧹 Domestic (घरेलू)</Link>
-              </li>
+           
               <li className={isDashboardActive && currentType === 'complaint' ? 'active-sub' : ''}>
                 <Link to="/dashboard?type=complaint">📢 Complaint (शिकायत)</Link>
               </li>
