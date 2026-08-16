@@ -127,13 +127,13 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="login-dummy-notice">
+          {/* <div className="login-dummy-notice">
             <div className="dummy-title">ℹ️ Demo / Testing Credentials:</div>
             <div className="dummy-credentials">
               <span>Username: <strong>1234</strong></span>
               <span>Password: <strong>1234</strong></span>
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

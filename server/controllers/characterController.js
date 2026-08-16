@@ -236,7 +236,6 @@ const complaintList = async (req, res, next) => {
 
 // postmortemList
 
-
 const postmortemList = async (req, res, next) => {
   try {
     const { loc } = req.query;
@@ -946,118 +945,245 @@ console.log(" you called PendingDurationSummary .........");
    
 try{
    const { userid } = req.user;
-   console.log("userid ", userid);
   
-   const query = `SELECT
-    ROW_NUMBER() OVER (ORDER BY ApplicationType) AS SNo,
-    ApplicationType,
+//   const query = `SELECT
+//     ROW_NUMBER() OVER (ORDER BY ApplicationType) AS SNo,
+//     ApplicationType,
 
-    COUNT(request_number) AS Total,
+//     COUNT(request_number) AS Total,
 
-    SUM(CASE
-        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15
-        THEN 1 ELSE 0
-    END) AS Within15Days,
+//     SUM(CASE
+//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15
+//         THEN 1 ELSE 0
+//     END) AS Within15Days,
 
-    SUM(CASE
-        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30
-        THEN 1 ELSE 0
-    END) AS Between16To30Days,
+//     SUM(CASE
+//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30
+//         THEN 1 ELSE 0
+//     END) AS Between16To30Days,
 
-    SUM(CASE
-        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90
-        THEN 1 ELSE 0
-    END) AS Between31To90Days,
+//     SUM(CASE
+//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90
+//         THEN 1 ELSE 0
+//     END) AS Between31To90Days,
 
-    SUM(CASE
-        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180
-        THEN 1 ELSE 0
-    END) AS Between91To180Days,
+//     SUM(CASE
+//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180
+//         THEN 1 ELSE 0
+//     END) AS Between91To180Days,
 
-    SUM(CASE
-        WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365
-        THEN 1 ELSE 0
-    END) AS Between181To365Days,
+//     SUM(CASE
+//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365
+//         THEN 1 ELSE 0
+//     END) AS Between181To365Days,
 
-    SUM(CASE
-        WHEN DATEDIFF(CURDATE(), request_date) > 365
-        THEN 1 ELSE 0
-    END) AS Above01Year
+//     SUM(CASE
+//         WHEN DATEDIFF(CURDATE(), request_date) > 365
+//         THEN 1 ELSE 0
+//     END) AS Above01Year
 
-FROM (
+// FROM (
 
-    SELECT
-        request_number,
-        request_date,
-        pre_Current_Status,
-        per_Current_Status,
-        pre_station_code,
-        'Character' AS ApplicationType
-    FROM characters
+//     SELECT
+//         request_number,
+//         request_date,
+//         pre_Current_Status,
+//         per_Current_Status,
+//         pre_station_code,
+//         'Character' AS ApplicationType
+//     FROM characters
 
+//     UNION ALL
+
+//     SELECT
+//         request_number,
+//         request_date,
+//         pre_Current_Status,
+//         per_Current_Status,
+//         pre_station_code,
+//         'Employee' AS ApplicationType
+//     FROM employees
+
+//     UNION ALL
+
+//     SELECT
+//         request_number,
+//         request_date,
+//         pre_Current_Status,
+//         per_Current_Status,
+//         pre_station_code,
+//         'Tenant' AS ApplicationType
+//     FROM tenants
+
+//     UNION ALL
+
+//     SELECT
+//         request_number,
+//         request_date,
+//         pre_Current_Status,
+//         per_Current_Status,
+//         pre_station_code,
+//         'Domestic' AS ApplicationType
+//     FROM domestic
+
+// ) AS applications
+
+// JOIN station_
+//     ON station_.code = applications.pre_station_code
+
+// JOIN district_
+//     ON district_.code = station_.district_code
+
+// JOIN user_district ud
+//     ON ud.district_id = district_.id
+
+// WHERE ud.user_id = 10074
+
+//   AND (
+//       applications.pre_Current_Status IS NULL
+//       OR UPPER(TRIM(applications.pre_Current_Status))
+//          NOT IN ('APPROVED', 'REJECTED')
+//   )
+
+//   AND (
+//       applications.per_Current_Status IS NULL
+//       OR UPPER(TRIM(applications.per_Current_Status))
+//          NOT IN ('APPROVED', 'REJECTED')
+//   )
+
+// GROUP BY ApplicationType
+
+// ORDER BY ApplicationType`;
+
+const query = `SELECT
+    ROW_NUMBER() OVER (ORDER BY t.ApplicationType) AS SNo,
+    t.ApplicationType,
+    COALESCE(a.Total, 0) AS Total,
+    COALESCE(a.Within15Days, 0) AS Within15Days,
+    COALESCE(a.Between16To30Days, 0) AS Between16To30Days,
+    COALESCE(a.Between31To90Days, 0) AS Between31To90Days,
+    COALESCE(a.Between91To180Days, 0) AS Between91To180Days,
+    COALESCE(a.Between181To365Days, 0) AS Between181To365Days,
+    COALESCE(a.Above01Year, 0) AS Above01Year
+FROM
+(
+    SELECT 'Character' AS ApplicationType
     UNION ALL
-
-    SELECT
-        request_number,
-        request_date,
-        pre_Current_Status,
-        per_Current_Status,
-        pre_station_code,
-        'Employee' AS ApplicationType
-    FROM employees
-
+    SELECT 'Employee'
     UNION ALL
-
-    SELECT
-        request_number,
-        request_date,
-        pre_Current_Status,
-        per_Current_Status,
-        pre_station_code,
-        'Tenant' AS ApplicationType
-    FROM tenants
-
+    SELECT 'Tenant'
     UNION ALL
-
+    SELECT 'Domestic'
+) t
+LEFT JOIN
+(
     SELECT
-        request_number,
-        request_date,
-        pre_Current_Status,
-        per_Current_Status,
-        pre_station_code,
-        'Domestic' AS ApplicationType
-    FROM domestic
+        applications.ApplicationType,
 
-) AS applications
+        COUNT(applications.request_number) AS Total,
 
-JOIN station_
-    ON station_.code = applications.pre_station_code
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 0 AND 15
+                THEN 1 ELSE 0
+            END
+        ) AS Within15Days,
 
-JOIN district_
-    ON district_.code = station_.district_code
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 16 AND 30
+                THEN 1 ELSE 0
+            END
+        ) AS Between16To30Days,
 
-JOIN user_district ud
-    ON ud.district_id = district_.id
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 31 AND 90
+                THEN 1 ELSE 0
+            END
+        ) AS Between31To90Days,
 
-WHERE ud.user_id = 10074
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 91 AND 180
+                THEN 1 ELSE 0
+            END
+        ) AS Between91To180Days,
 
-  AND (
-      applications.pre_Current_Status IS NULL
-      OR UPPER(TRIM(applications.pre_Current_Status))
-         NOT IN ('APPROVED', 'REJECTED')
-  )
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 181 AND 365
+                THEN 1 ELSE 0
+            END
+        ) AS Between181To365Days,
 
-  AND (
-      applications.per_Current_Status IS NULL
-      OR UPPER(TRIM(applications.per_Current_Status))
-         NOT IN ('APPROVED', 'REJECTED')
-  )
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date) > 365
+                THEN 1 ELSE 0
+            END
+        ) AS Above01Year
 
-GROUP BY ApplicationType
+    FROM
+    (
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            'Character' AS ApplicationType
+        FROM characters
 
-ORDER BY ApplicationType`;
+        UNION ALL
 
-const [result] = await pool.execute(query);
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            'Employee' AS ApplicationType
+        FROM employees
+
+        UNION ALL
+
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            'Tenant' AS ApplicationType
+        FROM tenants
+
+        UNION ALL
+
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            'Domestic' AS ApplicationType
+        FROM domestic
+    ) applications
+
+    LEFT JOIN station_
+        ON station_.code = applications.pre_station_code
+
+    LEFT JOIN district_
+        ON district_.code = station_.district_code
+
+    LEFT JOIN user_district ud
+        ON ud.district_id = district_.id
+
+    WHERE ud.user_id = ?
+
+    GROUP BY applications.ApplicationType
+) a
+    ON a.ApplicationType = t.ApplicationType
+
+ORDER BY t.ApplicationType;`;
+
+const [result] = await pool.execute(query,[userid]);
 
 // Calculate total row
 const totalRow = {
@@ -1233,245 +1359,6 @@ const loginsession = async (req, res) => {
   }
 };
 
-
-
-
-// Dynamic helper to resolve ps source
-const getPsSource = async () => {
-  try {
-    await pool.execute('SELECT 1 FROM `ps` LIMIT 1');
-    return 'ps';
-  } catch (e) {
-    return "(SELECT DISTINCT `थाना`, NULL as CUG FROM `characters` WHERE `थाना` IS NOT NULL AND `थाना` <> '') ps";
-  }
-};
-
-// Database Query Helpers
-const fetchMinDate = async () => {
-  // const [rows] = await pool.execute('SELECT MIN(अनुरोध_दिनांक) as minDate FROM characters');
-  return rows[0]?.minDate || null;
-};
-
-const fetchMaxDate = async () => {
-  // const [rows] = await pool.execute('SELECT MAX(अनुरोध_दिनांक) as maxDate FROM characters');
-  return rows[0]?.maxDate || null;
-};
-
-const queryDashboardByDateRange = async (sdate, edate) => {
-  const psSource = await getPsSource();
-  const hasDates = Boolean(sdate && edate);
-  const dateClause = hasDates ? 'WHERE अनुरोध_दिनांक BETWEEN ? AND ?' : '';
-  const dateParams = hasDates ? [sdate, edate] : [];
-
-  const query = `
-  `;
-  const [rows] = await pool.execute(query);
-  return rows;
-};
-
-// ── Controller Handlers ────────────────────────────────────────────────────────
-
-const getMinDate = async (req, res, next) => {
-  try {
-    const minDate = await fetchMinDate();
-    res.json({ minDate });
-  } catch (err) {
-    next(err);
-  }
-};
-
-const getMaxDate = async (req, res, next) => {
-  try {
-    const maxDate = await fetchMaxDate();
-    res.json({ maxDate });
-  } catch (err) {
-    next(err);
-  }
-};
-
-const STANDARD_APP_TYPES = [
-  'कर्मचारी सत्यापन',
-  'घरेलू सहायता सत्यापन',
-  'चरित्र सत्यापन',
-  'पोस्टमार्टम रिपोर्ट अनुरोध',
-  'शिकायत',
-];
-
-const fetchAgingSummary = async (sdate, edate) => {
-  let where = `WHERE 1=1`;
-  const params = [];
-  if (sdate && edate) {
-    where += ` AND (अनुरोध_दिनांक BETWEEN ? AND ? OR request_date BETWEEN ? AND ?)`;
-    params.push(sdate, edate, sdate, edate);
-  }
-
-  try {
-    const [maxRows] = await pool.execute('SELECT MAX(COALESCE(अनुरोध_दिनांक, request_date)) as maxDate FROM characters');
-    const refDateSql = maxRows[0]?.maxDate ? `'${new Date(maxRows[0].maxDate).toISOString().slice(0,10)}'` : 'CURDATE()';
-
-    const sql = `
-      SELECT 
-        COALESCE(NULLIF(service, ''), 'चरित्र सत्यापन') AS app_type,
-        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) <= 15 THEN 1 ELSE 0 END) AS d15,
-        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 16 AND 30 THEN 1 ELSE 0 END) AS d30,
-        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 31 AND 90 THEN 1 ELSE 0 END) AS d90,
-        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 91 AND 180 THEN 1 ELSE 0 END) AS d180,
-        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) BETWEEN 181 AND 365 THEN 1 ELSE 0 END) AS d365,
-        SUM(CASE WHEN DATEDIFF(${refDateSql}, COALESCE(अनुरोध_दिनांक, request_date)) > 365 THEN 1 ELSE 0 END) AS dAbove1,
-        COUNT(*) as total_count
-      FROM characters
-      ${where}
-      GROUP BY app_type
-    `;
-    const [rows] = await pool.execute(sql, params);
-    
-    // Merge with standard 5 types to match exact image layout
-    const resultMap = new Map();
-    rows.forEach(r => resultMap.set(r.app_type, r));
-
-    return STANDARD_APP_TYPES.map((type, idx) => {
-      const found = resultMap.get(type) || {};
-      return {
-        sno: idx + 1,
-        app_type: type,
-        d15: Number(found.d15 || 0),
-        d30: Number(found.d30 || 0),
-        d90: Number(found.d90 || 0),
-        d180: Number(found.d180 || 0),
-        d365: Number(found.d365 || 0),
-        dAbove1: Number(found.dAbove1 || 0),
-        total_count: Number(found.total_count || 0),
-      };
-    });
-  } catch (err) {
-    console.error('Aging summary query error:', err.message);
-    return STANDARD_APP_TYPES.map((type, idx) => ({
-      sno: idx + 1,
-      app_type: type,
-      d15: 0, d30: 0, d90: 0, d180: 0, d365: 0, dAbove1: 0, total_count: 0
-    }));
-  }
-};
-
-const getDashboardByDate = async (req, res, next) => {
-  try {
-    const { sdate, edate } = req.body;
-    if (!sdate || !edate) {
-      return res.status(400).json({ error: 'sdate and edate are required' });
-    }
-    const data = await queryDashboardByDateRange(sdate, edate);
-    res.json(data);
-  } catch (err) {
-    next(err);
-  }
-};
-
-const getPending = async (req, res, next) => {
-  try {
-    const { loc } = req.query;
-    if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
-    }
-    let query = '';
-    let params = [];
-
-    if (loc === 'totaldcp') {
-      query = `SELECT * FROM characters WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(DCP_STATUSES)}) ORDER BY अनुरोध_दिनांक`;
-      params = DCP_STATUSES;
-    } else if (loc === 'totalliu') {
-      query = `SELECT * FROM characters WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(LIU_STATUSES)}) ORDER BY अनुरोध_दिनांक`;
-      params = LIU_STATUSES;
-    } else if (loc === 'totalps') {
-      query = `SELECT * FROM characters WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(PS_STATUSES)})`;
-      params = PS_STATUSES;
-    } else if (loc === 'totaldcrb') {
-      query = `SELECT * FROM characters WHERE अनुरोध_की_स्थिति IN (${makePlaceholders(DCRB_STATUSES)}) ORDER BY अनुरोध_दिनांक`;
-      params = DCRB_STATUSES;
-    } else if (loc === 'totalremain') {
-      query = `SELECT * FROM characters WHERE अनुरोध_की_स्थिति NOT IN ('स्वीकृत','अस्वीकृत') ORDER BY थाना, अनुरोध_दिनांक`;
-    } else if (loc === 'totaldiff') {
-      query = `SELECT * FROM characters WHERE अनुरोध_की_स्थिति NOT IN ('स्वीकृत','अस्वीकृत') AND वर्तमान_पता <> स्थायी_पता`;
-    } else {
-      return res.status(400).json({ error: 'Invalid loc parameter' });
-    }
-
-    const [rows] = await pool.execute(query, params);
-    res.json(rows);
-  } catch (err) {
-    next(err);
-  }
-};
-
-const getDetails = async (req, res, next) => {
-  try {
-    const { loc, ps, sdate, edate } = req.query;
-    let query = '';
-    let params = [];
-
-    const dateFilter = sdate && edate ? ' AND अनुरोध_दिनांक BETWEEN ? AND ?' : '';
-    const psParam = ps ? [ps] : [];
-    const dateParam = sdate && edate ? [sdate, edate] : [];
-
-    if (loc === 'dcp') {
-      query = `SELECT * FROM characters WHERE थाना = ?${dateFilter} AND अनुरोध_की_स्थिति IN (${makePlaceholders(DCP_STATUSES)})`;
-      params = [...psParam, ...dateParam, ...DCP_STATUSES];
-    } else if (loc === 'liu') {
-      query = `SELECT * FROM characters WHERE थाना = ?${dateFilter} AND अनुरोध_की_स्थिति IN (${makePlaceholders(LIU_STATUSES)})`;
-      params = [...psParam, ...dateParam, ...LIU_STATUSES];
-    } else if (loc === 'ps') {
-      query = `SELECT * FROM characters WHERE थाना = ?${dateFilter} AND अनुरोध_की_स्थिति IN (${makePlaceholders(PS_STATUSES)})`;
-      params = [...psParam, ...dateParam, ...PS_STATUSES];
-    } else if (loc === 'dcrb') {
-      query = `SELECT * FROM characters WHERE थाना = ?${dateFilter} AND अनुरोध_की_स्थिति IN (${makePlaceholders(DCRB_STATUSES)})`;
-      params = [...psParam, ...dateParam, ...DCRB_STATUSES];
-    } else if (loc === 'remain') {
-      query = `SELECT * FROM characters WHERE थाना = ?${dateFilter} AND अनुरोध_की_स्थिति NOT IN ('स्वीकृत','अस्वीकृत')`;
-      params = [...psParam, ...dateParam];
-    } else if (loc === 'all') {
-      query = `SELECT * FROM characters WHERE थाना = ?${dateFilter}`;
-      params = [...psParam, ...dateParam];
-    } else if (loc === 'totaldcp') {
-      query = `SELECT * FROM characters WHERE${dateFilter.replace(' AND', '')} अनुरोध_की_स्थिति IN (${makePlaceholders(DCP_STATUSES)})`;
-      params = [...dateParam, ...DCP_STATUSES];
-    } else if (loc === 'totalliu') {
-      query = `SELECT * FROM characters WHERE${dateFilter.replace(' AND', '')} अनुरोध_की_स्थिति IN (${makePlaceholders(LIU_STATUSES)})`;
-      params = [...dateParam, ...LIU_STATUSES];
-    } else if (loc === 'totaldcrb') {
-      query = `SELECT * FROM characters WHERE${dateFilter.replace(' AND', '')} अनुरोध_की_स्थिति IN (${makePlaceholders(DCRB_STATUSES)})`;
-      params = [...dateParam, ...DCRB_STATUSES];
-    } else if (loc === 'totalps') {
-      query = `SELECT * FROM characters WHERE${dateFilter.replace(' AND', '')} अनुरोध_की_स्थिति IN (${makePlaceholders(PS_STATUSES)})`;
-      params = [...dateParam, ...PS_STATUSES];
-    } else if (loc === 'totalremain') {
-      query = `SELECT * FROM characters WHERE${dateFilter.replace(' AND', '')} अनुरोध_की_स्थिति NOT IN ('स्वीकृत','अस्वीकृत')`;
-      params = [...dateParam];
-    } else {
-      return res.status(400).json({ error: 'Invalid loc parameter' });
-    }
-
-    const [rows] = await pool.execute(query, params);
-    res.json(rows);
-  } catch (err) {
-    next(err);
-  }
-};
-
-const getRemain = async (req, res, next) => {
-  try {
-    const { ps, sdate, edate } = req.query;
-    if (!ps || !sdate || !edate) {
-      return res.status(400).json({ error: 'ps, sdate, edate are required' });
-    }
-    const [rows] = await pool.execute(
-      `SELECT * FROM characters WHERE थाना = ? AND अनुरोध_दिनांक BETWEEN ? AND ? AND अनुरोध_की_स्थिति NOT IN ('स्वीकृत','अस्वीकृत')`,
-      [ps, sdate, edate]
-    );
-    res.json(rows);
-  } catch (err) {
-    next(err);
-  }
-};
-
 const uploadFile = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -1501,16 +1388,13 @@ const uploadFile = async (req, res, next) => {
   }
 };
 
+
+
 module.exports = {
-  getMinDate,
-  getMaxDate,
+
   Dashboard,
   PendingDurationSummary,
   combinedDashbaord,
-  getDashboardByDate,
-  getPending,
-  getDetails,
-  getRemain,
   uploadFile,
   characterList,
   employeeList,

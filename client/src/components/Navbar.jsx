@@ -184,18 +184,9 @@ export default function Navbar() {
                 <li className={isComplaintsActive ? 'active-menu' : ''}>
             <Link to="/characters?type=complaint&loc=totalremain" className="menu-title">🧹 Complaints</Link>
             <ul>
-              <li className={isComplaintsActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+              {/* <li className={isComplaintsActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
                 <Link to="/characters?type=complaint&loc=totalps">STATION (थाना)</Link>
-              </li>
-              <li className={isComplaintsActive && currentLoc === 'totalliu' ? 'active-sub' : ''}>
-                <Link to="/characters?type=complaint&loc=totalliu">LIU (एलआईयू)</Link>
-              </li>
-              <li className={isComplaintsActive && currentLoc === 'totaldcrb' ? 'active-sub' : ''}>
-                <Link to="/characters?type=complaint&loc=totaldcrb">DCRB (डीसीआरबी)</Link>
-              </li>
-              <li className={isComplaintsActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
-                <Link to="/characters?type=complaint&loc=totaldcp">DCP (डीसीपी)</Link>
-              </li>
+              </li> */}
               
               
             </ul>
@@ -206,12 +197,12 @@ export default function Navbar() {
                 <li className={isPostmortemActive ? 'active-menu' : ''}>
             <Link to="/characters?type=postmortem&loc=totalremain" className="menu-title">🧹 Postmortem</Link>
             <ul>
-              <li className={isPostmortemActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+              {/* <li className={isPostmortemActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
                 <Link to="/characters?type=postmortem&loc=totalps">STATION (थाना)</Link>
               </li>
               <li className={isPostmortemActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=postmortem&loc=totaldcp">DCP (डीसीपी)</Link>
-              </li>
+              </li> */}
               
               
             </ul>
