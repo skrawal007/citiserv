@@ -14,47 +14,81 @@ const {
 
 
 const conditions = {
-      totaldcp: "pre_Current_Status ='DCP'",
-      totalliu: "pre_Current_Status LIKE '%LIU%'",
-      totalps: "pre_Current_Status LIKE '%PS%'",
-      totaldcrb: "pre_Current_Status LIKE '%DCRB%'",
-      totalremain: ` ((pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND per_Current_Status IS NULL)
-      OR( pre_Current_Status NOT IN ('APPROVED', 'REJECTED')  AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')))`,
-      totaldiff: `pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')`,
-      OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
-    };
+  all: "1=1",
+  remain: `((pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND per_Current_Status IS NULL) OR (pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')))`,
+  ps: "pre_Current_Status LIKE '%PS%'",
+  dcrb: "pre_Current_Status LIKE '%DCRB%'",
+  liu: "pre_Current_Status LIKE '%LIU%'",
+  dcp: "pre_Current_Status ='DCP'",
+  own_to_other: "pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
+  other_to_own: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+
+  totaldcp: "pre_Current_Status ='DCP'",
+  totalliu: "pre_Current_Status LIKE '%LIU%'",
+  totalps: "pre_Current_Status LIKE '%PS%'",
+  totaldcrb: "pre_Current_Status LIKE '%DCRB%'",
+  totalremain: ` ((pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND per_Current_Status IS NULL)
+  OR( pre_Current_Status NOT IN ('APPROVED', 'REJECTED')  AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')))`,
+  totaldiff: `pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')`,
+  OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+};
 
 const characterList = async (req, res, next) => {
   try {
-    console.log("Charcter list req.query ", req.query);
-    const { loc,sdate,edate } = req.query;
-    const {userid} =req.user;
+    console.log("Character list req.query ", req.query);
+    const { loc, sdate, edate, ps, days } = req.query;
+    const { userid } = req.user;
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
 
-    const characterUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
+    const characterUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
     const stationColumn = characterUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
 
-    const query =` SELECT characters.* FROM characters 
+    let query = `
+      SELECT characters.* FROM characters 
       JOIN station_ ON station_.code = characters.${stationColumn}
-    -- JOIN user_station ON user_station.station_id = station_.id
       JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id= district_.id
-      WHERE  ${condition} 
-      AND user_district.user_id = ? AND request_date BETWEEN ? AND ? 
-      ORDER BY pre_station_name, request_date;`;
+      JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${condition} AND user_district.user_id = ?
+    `;
+    const params = [userid];
 
-    console.log(mysql.format(query,[req.user.userid,sdate,edate]));
+    if (sdate && edate) {
+      query += ` AND request_date BETWEEN ? AND ?`;
+      params.push(sdate, edate);
+    }
 
-      const [rows] = await pool.execute(query, [userid, sdate,edate]);
+    if (ps) {
+      query += ` AND (characters.${stationColumn} = ? OR station_.name = ?)`;
+      params.push(ps, ps);
+    }
 
+    if (days) {
+      if (days === '0-15') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
+      } else if (days === '16-30') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
+      } else if (days === '31-90') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
+      } else if (days === '91-180') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
+      } else if (days === '181-365') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
+      } else if (days === '365+') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
+      }
+    }
+
+    query += ` ORDER BY pre_station_name, request_date;`;
+
+    console.log(mysql.format(query, params));
+    const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
     console.error('Error fetching character list:', err);
@@ -64,39 +98,61 @@ const characterList = async (req, res, next) => {
 
 const employeeList = async (req, res, next) => {
   try {
-    const { loc } = req.query;
-    const {userid} =req.user;
+    console.log("Employee list req.query ", req.query);
+    const { loc, sdate, edate, ps, days } = req.query;
+    const { userid } = req.user;
 
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
   
-    const employeeUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
-
+    const employeeUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
     const stationColumn = employeeUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
 
-
-    // const query = `SELECT * FROM employees WHERE ${condition} ORDER BY pre_station_name, request_date`;
-
-    const query =` 
+    let query = `
       SELECT employees.* FROM employees 
-      JOIN station_ ON station_.code = ${stationColumn}
+      JOIN station_ ON station_.code = employees.${stationColumn}
       JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id= district_.id
-      WHERE  ${condition} 
-	      AND user_district.user_id = 10074
-      ORDER BY pre_station_name, request_date;`;
-        
-  //  console.log(mysql.format(query));
+      JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${condition} AND user_district.user_id = ?
+    `;
+    const params = [userid];
 
-    const [rows] = await pool.execute(query,[userid]);
+    if (sdate && edate) {
+      query += ` AND request_date BETWEEN ? AND ?`;
+      params.push(sdate, edate);
+    }
 
+    if (ps) {
+      query += ` AND (employees.${stationColumn} = ? OR station_.name = ?)`;
+      params.push(ps, ps);
+    }
+
+    if (days) {
+      if (days === '0-15') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
+      } else if (days === '16-30') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
+      } else if (days === '31-90') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
+      } else if (days === '91-180') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
+      } else if (days === '181-365') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
+      } else if (days === '365+') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
+      }
+    }
+
+    query += ` ORDER BY pre_station_name, request_date;`;
+
+    console.log(mysql.format(query, params));
+    const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
     console.error('Error fetching employee list:', err);
@@ -106,8 +162,9 @@ const employeeList = async (req, res, next) => {
 
 const tenantList = async (req, res, next) => {
   try {
-    const { loc } = req.query;
-    const {userid} =req.user;
+    console.log("Tenant list req.query ", req.query);
+    const { loc, sdate, edate, ps, days } = req.query;
+    const { userid } = req.user;
 
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
@@ -118,25 +175,48 @@ const tenantList = async (req, res, next) => {
       return res.status(400).json({ error: 'Invalid list location' });
     }
   
-    const tenantsUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
-
+    const tenantsUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
     const stationColumn = tenantsUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
 
-
-   
-    const query =` 
+    let query = `
       SELECT tenants.* FROM tenants 
-      JOIN station_ ON station_.code = ${stationColumn}
+      JOIN station_ ON station_.code = tenants.${stationColumn}
       JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id= district_.id
-      WHERE  ${condition} 
-	      AND user_district.user_id = ?
-      ORDER BY pre_station_name, request_date;`;
-        
-  //  console.log(mysql.format(query));
+      JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${condition} AND user_district.user_id = ?
+    `;
+    const params = [userid];
 
-    const [rows] = await pool.execute(query,[userid]);
+    if (sdate && edate) {
+      query += ` AND request_date BETWEEN ? AND ?`;
+      params.push(sdate, edate);
+    }
 
+    if (ps) {
+      query += ` AND (tenants.${stationColumn} = ? OR station_.name = ?)`;
+      params.push(ps, ps);
+    }
+
+    if (days) {
+      if (days === '0-15') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
+      } else if (days === '16-30') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
+      } else if (days === '31-90') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
+      } else if (days === '91-180') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
+      } else if (days === '181-365') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
+      } else if (days === '365+') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
+      }
+    }
+
+    query += ` ORDER BY pre_station_name, request_date;`;
+
+    console.log(mysql.format(query, params));
+    const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
     console.error('Error fetching tenant list:', err);
@@ -146,36 +226,60 @@ const tenantList = async (req, res, next) => {
 
 const domesticList = async (req, res, next) => {
   try {
-    const { loc } = req.query;
-    const {userid} =req.user;
+    console.log("Domestic list req.query ", req.query);
+    const { loc, sdate, edate, ps, days } = req.query;
+    const { userid } = req.user;
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    
     const condition = conditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
   
-    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
-
+    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
     const stationColumn = domesticUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
 
-
-    const query =` 
+    let query = `
       SELECT domestic.* FROM domestic 
-      JOIN station_ ON station_.code = ${stationColumn}
+      JOIN station_ ON station_.code = domestic.${stationColumn}
       JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id= district_.id
-      WHERE  ${condition} 
-	      AND user_district.user_id = ?
-      ORDER BY pre_station_name, request_date;`;
-        
- //  console.log(mysql.format(query));
+      JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${condition} AND user_district.user_id = ?
+    `;
+    const params = [userid];
 
-    const [rows] = await pool.execute(query,[userid]);
+    if (sdate && edate) {
+      query += ` AND request_date BETWEEN ? AND ?`;
+      params.push(sdate, edate);
+    }
 
+    if (ps) {
+      query += ` AND (domestic.${stationColumn} = ? OR station_.name = ?)`;
+      params.push(ps, ps);
+    }
+
+    if (days) {
+      if (days === '0-15') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
+      } else if (days === '16-30') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
+      } else if (days === '31-90') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
+      } else if (days === '91-180') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
+      } else if (days === '181-365') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
+      } else if (days === '365+') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
+      }
+    }
+
+    query += ` ORDER BY pre_station_name, request_date;`;
+
+    console.log(mysql.format(query, params));
+    const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
     console.error('Error fetching domestic list:', err);
@@ -183,106 +287,150 @@ const domesticList = async (req, res, next) => {
   }
 };
 
-// complaintList
-
 const complaintList = async (req, res, next) => {
   try {
-    const { loc } = req.query;
-    const {userid} =req.user;
+    console.log("Complaint list req.query ", req.query);
+    const { loc, sdate, edate, ps, days } = req.query;
+    const { userid } = req.user;
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-        const conditions = {
+    const localConditions = {
+      all: "1=1",
+      remain: "pre_Current_Status NOT IN ('FINISHED', 'REJECTED')",
+      dcp: "pre_Current_Status ='DCP'",
       totaldcp: "pre_Current_Status ='DCP'",
-      totalremain: `pre_Current_Status  NOT IN ('FINISHED', 'REJECTED')`,
+      totalremain: "pre_Current_Status NOT IN ('FINISHED', 'REJECTED')",
     };
     
-    const condition = conditions[loc];
+    const condition = localConditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
   
-    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
-
-
-
-    const query =`
-        SELECT 
-
+    let query = `
+      SELECT 
         complaints.district_code AS pre_district_code,
         complaints.district_name AS pre_district_name,
         complaints.station_code AS pre_station_code,
         complaints.station_name AS pre_station_name,
-
         complaints.*
-        FROM complaints 
-          JOIN station_ ON station_.code = station_code
-          JOIN district_ ON district_.code = station_.district_code
-          JOIN user_district ON user_district.district_id= district_.id
-          WHERE ${condition} AND user_district.user_id = ?
-          ORDER BY  request_date;`;
-        
-   console.log(mysql.format(query,[userid]));
+      FROM complaints 
+      JOIN station_ ON station_.code = station_code
+      JOIN district_ ON district_.code = station_.district_code
+      JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${condition} AND user_district.user_id = ?
+    `;
+    const params = [userid];
 
-    const [rows] = await pool.execute(query,[userid]);
+    if (sdate && edate) {
+      query += ` AND request_date BETWEEN ? AND ?`;
+      params.push(sdate, edate);
+    }
 
+    if (ps) {
+      query += ` AND (complaints.station_code = ? OR station_.name = ?)`;
+      params.push(ps, ps);
+    }
+
+    if (days) {
+      if (days === '0-15') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
+      } else if (days === '16-30') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
+      } else if (days === '31-90') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
+      } else if (days === '91-180') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
+      } else if (days === '181-365') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
+      } else if (days === '365+') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
+      }
+    }
+
+    query += ` ORDER BY request_date;`;
+
+    console.log(mysql.format(query, params));
+    const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching domestic list:', err);
+    console.error('Error fetching complaint list:', err);
     return next(err);
   }
 };
 
-// postmortemList
-
 const postmortemList = async (req, res, next) => {
   try {
-    const { loc } = req.query;
-    const {userid} =req.user;
+    console.log("Postmortem list req.query ", req.query);
+    const { loc, sdate, edate, ps, days } = req.query;
+    const { userid } = req.user;
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
 
-    
-
-
-    const conditions = {
+    const localConditions = {
+      all: "1=1",
+      remain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
+      dcp: "pre_Current_Status ='DCP'",
       totaldcp: "pre_Current_Status ='DCP'",
-      totalremain: `pre_Current_Status  NOT IN ('APPROVED', 'REJECTED')`,
+      totalremain: "pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
     };
 
-    const condition = conditions[loc];
+    const condition = localConditions[loc];
     if (!condition) {
       return res.status(400).json({ error: 'Invalid list location' });
     }
   
-    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS'; 
-
-
-    const query =`
-        SELECT 
-
+    let query = `
+      SELECT 
         postmortem.district_code AS pre_district_code,
         postmortem.district_name AS pre_district_name,
         postmortem.station_code AS pre_station_code,
         postmortem.station_name AS pre_station_name,
-
         postmortem.*
-        FROM postmortem 
-          JOIN station_ ON station_.code = station_code
-          JOIN district_ ON district_.code = station_.district_code
-          JOIN user_district ON user_district.district_id= district_.id
-          WHERE ${condition} AND user_district.user_id = ?
-          ORDER BY  request_date;`;
-        
-  //  console.log(mysql.format(query, [userid]));
+      FROM postmortem 
+      JOIN station_ ON station_.code = station_code
+      JOIN district_ ON district_.code = station_.district_code
+      JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${condition} AND user_district.user_id = ?
+    `;
+    const params = [userid];
 
-    const [rows] = await pool.execute(query,[userid]);
+    if (sdate && edate) {
+      query += ` AND request_date BETWEEN ? AND ?`;
+      params.push(sdate, edate);
+    }
 
+    if (ps) {
+      query += ` AND (postmortem.station_code = ? OR station_.name = ?)`;
+      params.push(ps, ps);
+    }
+
+    if (days) {
+      if (days === '0-15') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
+      } else if (days === '16-30') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
+      } else if (days === '31-90') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
+      } else if (days === '91-180') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
+      } else if (days === '181-365') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
+      } else if (days === '365+') {
+        query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
+      }
+    }
+
+    query += ` ORDER BY request_date;`;
+
+    console.log(mysql.format(query, params));
+    const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching domestic list:', err);
+    console.error('Error fetching postmortem list:', err);
     return next(err);
   }
 };
@@ -961,6 +1109,7 @@ const query = `
 SELECT
     ROW_NUMBER() OVER (ORDER BY t.ApplicationType) AS SNo,
     t.ApplicationType,
+    t.typeKey,
     COALESCE(a.Total, 0) AS Total,
     COALESCE(a.Within15Days, 0) AS Within15Days,
     COALESCE(a.Between16To30Days, 0) AS Between16To30Days,
@@ -970,17 +1119,17 @@ SELECT
     COALESCE(a.Above01Year, 0) AS Above01Year
 FROM
 (
-    SELECT 'Character' AS ApplicationType
+    SELECT 'Character' AS ApplicationType, 'character' AS typeKey
     UNION ALL
-    SELECT 'Employee'
+    SELECT 'Employee' AS ApplicationType, 'employee' AS typeKey
     UNION ALL
-    SELECT 'Tenant'
+    SELECT 'Tenant' AS ApplicationType, 'tenant' AS typeKey
     UNION ALL
-    SELECT 'Domestic'
+    SELECT 'Domestic' AS ApplicationType, 'domestic' AS typeKey
     UNION ALL
-    SELECT 'Postmortem'
+    SELECT 'Postmortem' AS ApplicationType, 'postmortem' AS typeKey
     UNION ALL
-    SELECT 'Complaints'
+    SELECT 'Complaints' AS ApplicationType, 'complaint' AS typeKey
 ) t
 LEFT JOIN
 (

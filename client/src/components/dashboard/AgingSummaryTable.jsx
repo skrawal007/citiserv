@@ -9,8 +9,13 @@ export default function AgingSummaryTable() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     
-  const detailLink = (typeKey, daysRange) =>
-    `/characters?type=${typeKey}&days=${daysRange}`;
+  const detailLink = (typeKey, daysRange) => {
+    let url = `/characters?type=${typeKey}&loc=remain`;
+    if (daysRange) {
+      url += `&days=${daysRange}`;
+    }
+    return url;
+  };
 
 
     useEffect(() => {
@@ -67,25 +72,25 @@ export default function AgingSummaryTable() {
               <td className="td-sno">{r.sno || i + 1}</td>
               <td className="td-app-type">{r.ApplicationType}</td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey )} className="count-link">{r.Total}</Link>
+                <Link to={detailLink(r.typeKey)} className="count-link">{r.Total}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey )} className="count-link">{r.Within15Days}</Link>
+                <Link to={detailLink(r.typeKey, '0-15')} className="count-link">{r.Within15Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey )} className="count-link">{r.Between16To30Days}</Link>
+                <Link to={detailLink(r.typeKey, '16-30')} className="count-link">{r.Between16To30Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey )} className="count-link">{r.Between31To90Days}</Link>
+                <Link to={detailLink(r.typeKey, '31-90')} className="count-link">{r.Between31To90Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey)} className="count-link">{r.Between91To180Days}</Link>
+                <Link to={detailLink(r.typeKey, '91-180')} className="count-link">{r.Between91To180Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey)} className="count-link">{r.Between181To365Days}</Link>
+                <Link to={detailLink(r.typeKey, '181-365')} className="count-link">{r.Between181To365Days}</Link>
               </td>
               <td className="td-count">
-                <Link to={detailLink(r.typeKey)} className="count-link">{r.Above01Year}</Link>
+                <Link to={detailLink(r.typeKey, '365+')} className="count-link">{r.Above01Year}</Link>
               </td>
             </tr>
           ))}

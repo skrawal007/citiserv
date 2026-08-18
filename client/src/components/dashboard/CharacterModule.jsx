@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import { API_BASE } from '../../config/env';
 export default function CharacterModule({ activeFilter,activeModule, sdate, edate }) {
   const [stationRows, setStationRows] = useState([]);
@@ -87,44 +88,44 @@ export default function CharacterModule({ activeFilter,activeModule, sdate, edat
                 <td>{i + 1}</td>
                 <td style={{ fontWeight: '600' }}>{r.pre_station_name }</td>
                 <td className={getHighlightClass('all')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=all&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=all&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.request_count || r.c_total || 0}
-                  </a>
+                  </Link>
                 </td>
                 <td className={getHighlightClass('remain')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=remain&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=remain&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.pending_count || r.c_remain || 0}
-                  </a>
+                  </Link>
                 </td>
                 <td className={getHighlightClass('ps')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=ps&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=ps&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.pending_ps_count || r.c_station || 0}
-                  </a>
+                  </Link>
                 </td>
                 <td className={getHighlightClass('dcrb')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=dcrb&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=dcrb&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.pending_dcrb_count || r.c_dcrb || 0}
-                  </a>
+                  </Link>
                 </td>
                 <td className={getHighlightClass('liu')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=liu&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=liu&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.pending_liu_count || r.c_liu || 0}
-                  </a>
+                  </Link>
                 </td>
                 <td className={getHighlightClass('dcp')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=dcp&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=dcp&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.pending_dcp_count || r.c_dcp || 0}
-                  </a>
+                  </Link>
                 </td>
                 <td className={getHighlightClass('own_to_other')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=own_to_other&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=own_to_other&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.own_to_other || r.c_own_to_other || 0}
-                  </a>
+                  </Link>
                 </td>
                  <td className={getHighlightClass('other_to_own')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${sdate}&edate=${edate}&loc=other_to_own&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
+                  <Link to={`/characters?type=${activeModule}&sdate=${sdate}&edate=${edate}&loc=other_to_own&ps=${encodeURIComponent(r.pre_station_code || r.pre_station_name || '')}`}>
                     {r.other_to_own || r.c_other_to_own || 0}
-                  </a>
+                  </Link>
                 </td>
               </tr>
             ))}

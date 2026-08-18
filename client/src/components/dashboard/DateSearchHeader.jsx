@@ -8,6 +8,9 @@ export default function DateSearchHeader({
   setSdate,
   edate,
   setEdate,
+  policeStations =[],
+  selectedPoliceStation = "",
+  setSelectedPoliceStation,
 }) {
   // Today's date in YYYY-MM-DD format
   const getToday = () => {
@@ -27,7 +30,13 @@ export default function DateSearchHeader({
   const [tempEdate, setTempEdate] = useState(edate);
 
   const [dateError, setDateError] = useState("");
-
+  const [localPoliceStation, setLocalPoliceStation] = useState("");
+  const isDashboardOrUpload =
+    typeof window !== "undefined" &&
+    ["/dashboard", "/upload"].includes(window.location.pathname);
+  const policeStationValue = setSelectedPoliceStation
+    ? selectedPoliceStation
+    : localPoliceStation;
   // When modal opens, copy parent values
   useEffect(() => {
     if (showSearch) {
@@ -110,12 +119,39 @@ export default function DateSearchHeader({
           </div>
         </div>
 
-        <button
-          className="search-trigger-btn"
-          onClick={() => setShowSearch(true)}
-        >
-          🔍 दिनांक द्वारा खोजें
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          {!isDashboardOrUpload && (
+            <select
+              aria-label="Select police station"
+              className="search-trigger-btn"
+              value={policeStationValue}
+              onChange={(e) => {
+                setLocalPoliceStation(e.target.value);
+                setSelectedPoliceStation?.(e.target.value);
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              <option value="">All Stations</option>
+              {policeStations.map((station) => {
+                const value = typeof station === "string" ? station : station.value;
+                const label = typeof station === "string" ? station : station.label;
+
+                return (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                );
+              })}
+            </select>
+          )}
+
+          <button
+            className="search-trigger-btn"
+            onClick={() => setShowSearch(true)}
+          >
+            🔍 Search By Date
+          </button>
+        </div>
       </div>
 
       {showSearch && (

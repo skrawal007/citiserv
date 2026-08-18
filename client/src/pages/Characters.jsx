@@ -17,12 +17,24 @@ const MODULE_NAMES = {
 };
 
 const LOC_HEADINGS = {
+  // Long names
   totaldcp:     'कुल डीसीपी पर लम्बित',
   totalliu:     'कुल एलआईयू पर लम्बित',
   totaldcrb:    'कुल डीसीआरबी पर लम्बित',
   totalps:      'कुल थानों पर लम्बित',
   totalremain:  'समस्त पश्चिमी जोन पर लम्बित',
   totaldiff:    'अन्य थानों से सम्बन्धित लम्बित',
+  OTHER_TO_OWN_PS: 'अन्य थानों से सम्बन्धित लम्बित',
+  
+  // Short names
+  all:          'कुल प्राप्त',
+  remain:       'कुल लम्बित',
+  ps:           'थानों पर लम्बित',
+  dcrb:         'डीसीआरबी पर लम्बित',
+  liu:          'एलआईयू पर लम्बित',
+  dcp:          'डीसीपी पर लम्बित',
+  own_to_other: 'अन्य थानों से सम्बन्धित लम्बित',
+  other_to_own: 'अन्य थानों से सम्बन्धित लम्बित',
 };
 
 const LIST_ENDPOINTS = {
@@ -32,61 +44,92 @@ const LIST_ENDPOINTS = {
   domestic: '/domesticList',
   complaint : '/complaintList',
   postmortem : '/postmortemList'
-
 };
 
- 
-const hideStatus = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
-const hidePraAdd = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain'].includes(loc);
+const hideStatus = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain','dcp','liu','dcrb','ps','remain'].includes(loc);
+const hidePraAdd = (loc) => ['totaldcp','totalliu','totaldcrb','totalps','totalremain','dcp','liu','dcrb','ps','remain'].includes(loc);
 const hidePreAdd = (type) =>['complaint', 'postmortem'].includes(type);
 
 function fmt(d) { return d ? d.split('-').reverse().join('-') : ''; }
 
 export default function Characters({
-    showSearch,
+  showSearch,
   setShowSearch,
   sdate,
   setSdate,
   edate,
-  setEdate}) {
+  setEdate
+}) {
   const [searchParams] = useSearchParams();
-  const loc = searchParams.get('loc');
-  const type = searchParams.get('type');
+  const loc = searchParams.get('loc') || '';
+  const type = searchParams.get('type') || 'character';
+  const days = searchParams.get('days') || '';
+  const stationParam = searchParams.get('ps') || searchParams.get('station') || '';
+
+  const urlSdate = searchParams.get('sdate');
+  const urlEdate = searchParams.get('edate');
+
+  useEffect(() => {
+    if (urlSdate) setSdate(urlSdate);
+    if (urlEdate) setEdate(urlEdate);
+  }, [urlSdate, urlEdate, setSdate, setEdate]);
+
+  const [selectedPoliceStation, setSelectedPoliceStation] = useState(stationParam);
+
+  useEffect(() => {
+    setSelectedPoliceStation(stationParam);
+  }, [stationParam]);
+
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [policeStations, setPoliceStations] = useState([]);
   const tableRef = useRef(null);
 
-useEffect(() => {
-  const fetchData = async () => {
-    try { 
-      setLoading(true);
-      setError("");
-      setRows([]);
+  useEffect(() => {
+    const fetchData = async () => {
+      try { 
+        setLoading(true);
+        setError("");
+        setRows([]);
 
-      const endpoint = LIST_ENDPOINTS[type];
-      if (!endpoint) {
-        throw new Error('Unsupported verification type');
+        const endpoint = LIST_ENDPOINTS[type];
+        if (!endpoint) {
+          throw new Error('Unsupported verification type');
+        }
+        const res = await axios.get(endpoint, {
+          params: { loc, sdate, edate, ps: selectedPoliceStation, days },
+          ...getAuthConfig(),
+        });
+
+        const records = Array.isArray(res.data) ? res.data : [];
+        const stationEntries = records
+          .map((record) => {
+            const label = record['थाना'] || record.pre_station_name || record.station_name;
+            const value = record.pre_station_code || record.station_code || label;
+
+            return label ? [value, { value, label }] : null;
+          })
+          .filter(Boolean);
+        const stations = [...new Map(stationEntries).values()];
+
+        setRows(records);
+        setPoliceStations((prev) => {
+          if (prev.length > 0 && selectedPoliceStation) return prev;
+          return stations.length > 0 ? stations : prev;
+        });
+        console.log(" res.data ", res.data);
+
+      } catch (e) {
+        setError(e.response?.data?.error || e.message);
+      } finally {
+        setLoading(false);
       }
-      const res = await axios.get(endpoint, {
-        params: { loc,sdate,edate },
-        ...getAuthConfig(),
-      });
+    };
+    console.log("hidePreAdd ", hidePreAdd(type));
 
-      setRows(res.data || []);
-      console.log(" res.data ", res.data);
-
-    } catch (e) {
-      setError(e.response?.data?.error || e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-console.log("hidePreAdd " , hidePreAdd(type));
-
-
-  fetchData();
-}, [loc, type,sdate,edate]);
+    fetchData();
+  }, [loc, type, sdate, edate, selectedPoliceStation, days]);
 
 
   const moduleName = MODULE_NAMES[type] || MODULE_NAMES.character;
@@ -95,7 +138,6 @@ console.log("hidePreAdd " , hidePreAdd(type));
   const hideStatusCol = hideStatus(loc);
   const hidePraAddCol = hidePraAdd(loc);
   const hidePreAddCol = hidePreAdd(type);
-
 
 
   return (
@@ -109,6 +151,9 @@ console.log("hidePreAdd " , hidePreAdd(type));
             setSdate={setSdate}
             edate={edate}
             setEdate={setEdate}
+            policeStations={policeStations}
+            selectedPoliceStation={selectedPoliceStation}
+            setSelectedPoliceStation={setSelectedPoliceStation}
               />
       <div className="table-wrapper">
         <table id="printable" ref={tableRef}>

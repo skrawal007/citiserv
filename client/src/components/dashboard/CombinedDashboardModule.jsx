@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { Link } from 'react-router-dom';
 import { API_BASE } from '../../config/env';
 
 // Keep the initial dashboard response for this browser page session. React
@@ -133,52 +134,61 @@ export default function CombinedDashboardModule({ activeFilter, sdate, edate}) {
             {error && (
               <tr><td colSpan="9" style={{ textAlign: 'center', color: 'red' }}>{error}</td></tr>
             )}
-            {!loading && stationRows.map((r, i) => (
-              <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
-                <td>{i + 1}</td>
-                <td style={{ fontWeight: '600' }}>{r.verification_type }</td>
-                <td className={getHighlightClass('all')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=all&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.request_count || r.c_total || 0}
-                  </a>
-                </td>
-                <td className={getHighlightClass('remain')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=remain&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.pending_count || r.c_remain || 0}
-                  </a>
-                </td>
-                <td className={getHighlightClass('ps')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=ps&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.pending_ps_count || r.c_station || 0}
-                  </a>
-                </td>
-                <td className={getHighlightClass('dcrb')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=dcrb&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.pending_dcrb_count || r.c_dcrb || 0}
-                  </a>
-                </td>
-                <td className={getHighlightClass('liu')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=liu&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.pending_liu_count || r.c_liu || 0}
-                  </a>
-                </td>
-                <td className={getHighlightClass('dcp')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=dcp&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.pending_dcp_count || r.c_dcp || 0}
-                  </a>
-                </td>
-                <td className={getHighlightClass('own_to_other')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=own_to_other&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.own_to_other || r.c_own_to_other || 0}
-                  </a>
-                </td>
-                 <td className={getHighlightClass('other_to_own')}>
-                  <a href={`/detail?type=character&CUG=${encodeURIComponent(r.CUG || '')}&sdate=${minDate}&edate=${maxDate}&loc=other_to_own&ps=${encodeURIComponent(r.pre_station  || '')}`} target="_blank" rel="noreferrer">
-                    {r.other_to_own || r.c_other_to_own || 0}
-                  </a>
-                </td>
-              </tr>
-            ))}
+            {!loading && stationRows.map((r, i) => {
+              const map = {
+                'Tenants': 'tenant',
+                'Employee': 'employee',
+                'Character': 'character',
+                'Domestic': 'domestic',
+              };
+              const linkType = map[r.verification_type] || 'character';
+              return (
+                <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
+                  <td>{i + 1}</td>
+                  <td style={{ fontWeight: '600' }}>{r.verification_type}</td>
+                  <td className={getHighlightClass('all')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=all`}>
+                      {r.request_count || r.c_total || 0}
+                    </Link>
+                  </td>
+                  <td className={getHighlightClass('remain')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=remain`}>
+                      {r.pending_count || r.c_remain || 0}
+                    </Link>
+                  </td>
+                  <td className={getHighlightClass('ps')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=ps`}>
+                      {r.pending_ps_count || r.c_station || 0}
+                    </Link>
+                  </td>
+                  <td className={getHighlightClass('dcrb')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=dcrb`}>
+                      {r.pending_dcrb_count || r.c_dcrb || 0}
+                    </Link>
+                  </td>
+                  <td className={getHighlightClass('liu')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=liu`}>
+                      {r.pending_liu_count || r.c_liu || 0}
+                    </Link>
+                  </td>
+                  <td className={getHighlightClass('dcp')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=dcp`}>
+                      {r.pending_dcp_count || r.c_dcp || 0}
+                    </Link>
+                  </td>
+                  <td className={getHighlightClass('own_to_other')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=own_to_other`}>
+                      {r.own_to_other || r.c_own_to_other || 0}
+                    </Link>
+                  </td>
+                   <td className={getHighlightClass('other_to_own')}>
+                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=other_to_own`}>
+                      {r.other_to_own || r.c_other_to_own || 0}
+                    </Link>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

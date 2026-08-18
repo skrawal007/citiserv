@@ -9,64 +9,7 @@ import ComplaintModule from "../components/dashboard/ComplaintModule";
 import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
 
-// Reference Aging Dataset
-const DEFAULT_AGING_DATA = [
-  {
-    sno: 1,
-    typeKey: "employee",
-    label: "कर्मचारी सत्यापन",
-    d15: 32,
-    d30: 0,
-    d90: 0,
-    d180: 2,
-    d365: 0,
-    dAbove1: 0,
-  },
-  {
-    sno: 2,
-    typeKey: "domestic",
-    label: "घरेलू सहायता सत्यापन",
-    d15: 9,
-    d30: 4,
-    d90: 2,
-    d180: 0,
-    d365: 0,
-    dAbove1: 0,
-  },
-  {
-    sno: 3,
-    typeKey: "character",
-    label: "चरित्र सत्यापन",
-    d15: 1747,
-    d30: 0,
-    d90: 0,
-    d180: 0,
-    d365: 0,
-    dAbove1: 0,
-  },
-  {
-    sno: 4,
-    typeKey: "postmortem",
-    label: "पोस्टमार्टम रिपोर्ट अनुरोध",
-    d15: 1,
-    d30: 0,
-    d90: 0,
-    d180: 0,
-    d365: 0,
-    dAbove1: 0,
-  },
-  {
-    sno: 5,
-    typeKey: "complaint",
-    label: "शिकायत",
-    d15: 3,
-    d30: 1,
-    d90: 0,
-    d180: 0,
-    d365: 0,
-    dAbove1: 0,
-  },
-];
+
 
 export default function Dashboard({
   showSearch, 
@@ -84,12 +27,12 @@ export default function Dashboard({
   const [activeModule, setActiveModule] = useState(null);
   const [activeFilter, setActiveFilter] = useState(null);
 
-  const [agingRows, setAgingRows] = useState(DEFAULT_AGING_DATA);
-  // const [showSearch, setShowSearch] = useState(false);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  const [policeStations, setPoliceStations] = useState([]);
+  
 
 
   // Synchronize state with URL parameters
@@ -119,60 +62,44 @@ export default function Dashboard({
       return;
     }
 
-    loadDashboardData();
   }, [typeParam]);
 
-  async function loadDashboardData() {
-    setLoading(true);
-    setError("");
-    try {
-      const res = await axios.get("/dashboard", {
-        params: { type: typeParam },
-        ...getAuthConfig(),
-      });
-      if (
-        res.data &&
-        res.data.agingSummary &&
-        Array.isArray(res.data.agingSummary) &&
-        res.data.agingSummary.length > 0
-      ) {
-        const merged = DEFAULT_AGING_DATA.map((def) => {
-          const found = res.data.agingSummary.find(
-            (r) => r.app_type === def.label,
-          );
-          // if (found && (found.d15 > 0 || found.d30 > 0 || found.d90 > 0 || found.d180 > 0 || found.d365 > 0 || found.dAbove1 > 0)) {
-          //   return {
-          //     ...def,
-          //     d15: found.d15,
-          //     d30: found.d30,
-          //     d90: found.d90,
-          //     d180: found.d180,
-          //     d365: found.d365,
-          //     dAbove1: found.dAbove1,
-          //   };
-          // }
-          return def;
-        });
-        setAgingRows(merged);
-      }
-    } catch (e) {
-      console.warn("Using default aging dataset:", e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
+ 
 
-  const agingTotals = agingRows.reduce(
-    (acc, r) => ({
-      d15: acc.d15 + Number(r.d15 || 0),
-      d30: acc.d30 + Number(r.d30 || 0),
-      d90: acc.d90 + Number(r.d90 || 0),
-      d180: acc.d180 + Number(r.d180 || 0),
-      d365: acc.d365 + Number(r.d365 || 0),
-      dAbove1: acc.dAbove1 + Number(r.dAbove1 || 0),
-    }),
-    { d15: 0, d30: 0, d90: 0, d180: 0, d365: 0, dAbove1: 0 },
-  );
+   useEffect(() => {
+    let isActive = true;
+
+    async function loadPoliceStations() {
+      try {
+        const response = await axios.get('/dashboard', {
+          params: { type: 'character' },
+          ...getAuthConfig(),
+        });
+
+        console.log(" dasbhoard data list ", response.data);
+        const stations = (response.data?.stationRows || [])
+          .filter((station) => !station.isTotal && station.pre_station_name)
+          .map((station) => ({
+            value: station.pre_station_code || station.pre_station_name,
+            label: station.pre_station_name,
+          }));
+          console.log(" stations without active ", stations)
+        if (isActive) {
+          console.log(" stations without is active ", stations)
+          setPoliceStations(stations);
+        }
+      } catch (e) {
+        console.error('Unable to load police stations:', e);
+      }
+    }
+
+    loadPoliceStations();
+
+    console.log(" policeStations ", policeStations);
+    return () => {
+      isActive = false;
+    };
+  }, []);
 
   return (
     <>
@@ -187,7 +114,7 @@ export default function Dashboard({
           <DateSearchHeader
            showSearch={showSearch}
            setShowSearch={setShowSearch}
-            sdate={sdate}
+               sdate={sdate}
             setSdate={setSdate}
             edate={edate}
             setEdate={setEdate}
@@ -229,6 +156,7 @@ export default function Dashboard({
             <CharacterModule
               activeFilter={activeFilter}
               activeModule={activeModule}
+              policeStations={policeStations}
               sdate={sdate}
               edate={edate}
             />
