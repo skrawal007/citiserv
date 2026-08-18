@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Navbar() {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useNavigate(); 
   const [searchParams] = useSearchParams();
   const { user, logout } = useAuth();
 

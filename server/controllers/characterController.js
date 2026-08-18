@@ -940,122 +940,25 @@ result.push(totalRow);
   }
 
 }
+
 const PendingDurationSummary= async(req,res,next)=>{
 console.log(" you called PendingDurationSummary .........");
    
 try{
    const { userid } = req.user;
-  
-//   const query = `SELECT
-//     ROW_NUMBER() OVER (ORDER BY ApplicationType) AS SNo,
-//     ApplicationType,
 
-//     COUNT(request_number) AS Total,
+const query = `
 
-//     SUM(CASE
-//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15
-//         THEN 1 ELSE 0
-//     END) AS Within15Days,
 
-//     SUM(CASE
-//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30
-//         THEN 1 ELSE 0
-//     END) AS Between16To30Days,
 
-//     SUM(CASE
-//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90
-//         THEN 1 ELSE 0
-//     END) AS Between31To90Days,
 
-//     SUM(CASE
-//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180
-//         THEN 1 ELSE 0
-//     END) AS Between91To180Days,
 
-//     SUM(CASE
-//         WHEN DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365
-//         THEN 1 ELSE 0
-//     END) AS Between181To365Days,
 
-//     SUM(CASE
-//         WHEN DATEDIFF(CURDATE(), request_date) > 365
-//         THEN 1 ELSE 0
-//     END) AS Above01Year
 
-// FROM (
 
-//     SELECT
-//         request_number,
-//         request_date,
-//         pre_Current_Status,
-//         per_Current_Status,
-//         pre_station_code,
-//         'Character' AS ApplicationType
-//     FROM characters
 
-//     UNION ALL
 
-//     SELECT
-//         request_number,
-//         request_date,
-//         pre_Current_Status,
-//         per_Current_Status,
-//         pre_station_code,
-//         'Employee' AS ApplicationType
-//     FROM employees
-
-//     UNION ALL
-
-//     SELECT
-//         request_number,
-//         request_date,
-//         pre_Current_Status,
-//         per_Current_Status,
-//         pre_station_code,
-//         'Tenant' AS ApplicationType
-//     FROM tenants
-
-//     UNION ALL
-
-//     SELECT
-//         request_number,
-//         request_date,
-//         pre_Current_Status,
-//         per_Current_Status,
-//         pre_station_code,
-//         'Domestic' AS ApplicationType
-//     FROM domestic
-
-// ) AS applications
-
-// JOIN station_
-//     ON station_.code = applications.pre_station_code
-
-// JOIN district_
-//     ON district_.code = station_.district_code
-
-// JOIN user_district ud
-//     ON ud.district_id = district_.id
-
-// WHERE ud.user_id = 10074
-
-//   AND (
-//       applications.pre_Current_Status IS NULL
-//       OR UPPER(TRIM(applications.pre_Current_Status))
-//          NOT IN ('APPROVED', 'REJECTED')
-//   )
-
-//   AND (
-//       applications.per_Current_Status IS NULL
-//       OR UPPER(TRIM(applications.per_Current_Status))
-//          NOT IN ('APPROVED', 'REJECTED')
-//   )
-
-// GROUP BY ApplicationType
-
-// ORDER BY ApplicationType`;
-
-const query = `SELECT
+SELECT
     ROW_NUMBER() OVER (ORDER BY t.ApplicationType) AS SNo,
     t.ApplicationType,
     COALESCE(a.Total, 0) AS Total,
@@ -1074,6 +977,10 @@ FROM
     SELECT 'Tenant'
     UNION ALL
     SELECT 'Domestic'
+    UNION ALL
+    SELECT 'Postmortem'
+    UNION ALL
+    SELECT 'Complaints'
 ) t
 LEFT JOIN
 (
@@ -1131,57 +1038,136 @@ LEFT JOIN
 
     FROM
     (
+        /* Character */
         SELECT
             request_number,
             request_date,
             pre_station_code,
+            NULL AS district_code,
+            pre_current_status,
+            NULL AS current_status,
             'Character' AS ApplicationType
         FROM characters
 
         UNION ALL
 
+        /* Employee */
         SELECT
             request_number,
             request_date,
             pre_station_code,
+            NULL AS district_code,
+            pre_current_status,
+            NULL AS current_status,
             'Employee' AS ApplicationType
         FROM employees
 
         UNION ALL
 
+        /* Tenant */
         SELECT
             request_number,
             request_date,
             pre_station_code,
+            NULL AS district_code,
+            pre_current_status,
+            NULL AS current_status,
             'Tenant' AS ApplicationType
         FROM tenants
 
         UNION ALL
 
+        /* Domestic */
         SELECT
             request_number,
             request_date,
             pre_station_code,
+            NULL AS district_code,
+            pre_current_status,
+            NULL AS current_status,
             'Domestic' AS ApplicationType
         FROM domestic
+
+        UNION ALL
+
+        /* Postmortem */
+        SELECT
+            request_number,
+            request_date,
+            station_code AS pre_station_code,
+            district_code,
+            pre_Current_Status AS pre_current_status,
+            current_status,
+            'Postmortem' AS ApplicationType
+        FROM postmortem
+
+        UNION ALL
+
+        /* Complaints */
+        SELECT
+            request_number,
+            request_date,
+            station_code AS pre_station_code,
+            district_code,
+            pre_Current_Status AS pre_current_status,
+            current_status,
+            'Complaints' AS ApplicationType
+        FROM complaints
+
     ) applications
 
     LEFT JOIN station_
         ON station_.code = applications.pre_station_code
+        AND applications.ApplicationType NOT IN ('Postmortem', 'Complaints')
 
     LEFT JOIN district_
-        ON district_.code = station_.district_code
+        ON district_.code =
+            CASE
+                WHEN applications.ApplicationType IN ('Postmortem', 'Complaints')
+                    THEN applications.district_code
+                ELSE station_.district_code
+            END
 
     LEFT JOIN user_district ud
         ON ud.district_id = district_.id
 
-    WHERE ud.user_id = ?
+    WHERE
+        ud.user_id = ?
+
+        AND
+        (
+            /* Character, Employee, Tenant, Domestic */
+            (
+                applications.ApplicationType NOT IN ('Postmortem', 'Complaints')
+                AND applications.pre_current_status
+                    NOT IN ('APPROVED', 'REJECTED')
+            )
+
+            OR
+
+            /* Postmortem */
+            (
+                applications.ApplicationType = 'Postmortem'
+                AND applications.pre_current_status
+                    NOT IN ('APPROVED', 'REJECTED')
+            )
+
+            OR
+
+            /* Complaints */
+            (
+                applications.ApplicationType = 'Complaints'
+                AND applications.pre_Current_Status
+                    NOT IN ('FINISHED')
+            )
+        )
 
     GROUP BY applications.ApplicationType
+
 ) a
     ON a.ApplicationType = t.ApplicationType
 
-ORDER BY t.ApplicationType;`;
+ORDER BY t.ApplicationType`;
 
 const [result] = await pool.execute(query,[userid]);
 
@@ -1290,7 +1276,7 @@ let login = async (req, res) => {
         id: user.userid, // ensure this matches your DB column name
         username: user.username,
         usertype: user.usertype,
-        district_code: user.district_code || null,
+        // district_code: user.district_code || null,
       },
     });
   } catch (error) {
