@@ -974,3 +974,61 @@ td a:hover {
 /* ......................................................................... */
 
 
+.update-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+
+  min-width: 118px;
+  height: 48px;
+
+  border: none;
+  border-radius: 25px;
+
+  background: #ff5a00;
+  color: white;
+
+  font-size: 12px;
+  font-weight: 500;
+
+  cursor: pointer;
+
+  box-shadow: 0 8px 20px rgba(255, 90, 0, 0.25);
+
+  transition: all 0.2s ease;
+}
+
+.update-btn:hover:not(:disabled) {
+  background: #f45100;
+  box-shadow: 0 10px 25px rgba(255, 90, 0, 0.35);
+}
+
+.update-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.95;
+}
+
+/* Rotating circle */
+.spinner {
+  width: 18px;
+  height: 18px;
+
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #ffffff;
+
+  border-radius: 50%;
+
+  animation: update-spin 0.7s linear infinite;
+}
+
+@keyframes update-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.calendar-icon {
+  font-size: 18px;
+}

@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const { pool } = require('../database/db');
 const { processExcelBuffer } = require('../utils/excelParser');
 const mysql =require('mysql2/promise');
+const {submitRequestNumber,parseCurrentStatus} = require("../utils/statusChecker");
 
 const {
   PS_STATUSES,
@@ -35,9 +36,10 @@ const conditions = {
 
 const characterList = async (req, res, next) => {
   try {
-    console.log("Character list req.query ", req.query);
+    // console.log("Character list req.query ", req.query);
     const { loc, sdate, edate, ps, days } = req.query;
-    const { userid } = req.user;
+    const { userid,usertype } = req.user;
+    console.log(" userid ", userid, " usertype ", usertype);
     if (!loc) {
       return res.status(400).json({ error: 'loc parameter is required' });
     }
@@ -87,8 +89,9 @@ const characterList = async (req, res, next) => {
 
     query += ` ORDER BY pre_station_name, request_date;`;
 
-    console.log(mysql.format(query, params));
     const [rows] = await pool.execute(query, params);
+     console.log(mysql.format(query, params));
+
     return res.json(rows);
   } catch (err) {
     console.error('Error fetching character list:', err);
@@ -964,7 +967,7 @@ outgoing AS (
 
     WHERE ud.user_id = ?
       AND vr.request_date >= ?
-      AND vr.request_date < ?
+      AND vr.request_date <= ?
 
     GROUP BY vr.verification_type
 ),
@@ -986,7 +989,7 @@ incoming AS (
     WHERE ud.user_id = ?
 
       AND vr.request_date >= ?
-      AND vr.request_date < ?
+      AND vr.request_date <= ?
 
       AND vr.per_Current_Status IS NOT NULL
 
@@ -1025,12 +1028,14 @@ LEFT JOIN incoming i
 ORDER BY
     vt.verification_type`;
 
-// console.log(mysql.format(query, [ userid,
+// console.log(mysql.format(query, [ 
+// userid,
 //   sdate,
 //   edate,
 //   userid,
 //   sdate,
-//   edate]));    
+//   edate
+// ]));    
 
 const [result] = await pool.execute(query, [  
   userid,
@@ -1096,16 +1101,6 @@ try{
    const { userid } = req.user;
 
 const query = `
-
-
-
-
-
-
-
-
-
-
 SELECT
     ROW_NUMBER() OVER (ORDER BY t.ApplicationType) AS SNo,
     t.ApplicationType,
@@ -1523,6 +1518,30 @@ const uploadFile = async (req, res, next) => {
   }
 };
 
+const updateStatus = async(req,res,next)=>{
+      const { type, request_number } = req.query.type;
+console.log(" type ", type , "updateStatusrequest_number ", request_number);
+try {
+
+    if (!request_number) {
+      return res.status(400).json({
+        success: false,
+        message: "Request number is required",
+      });
+    }
+
+    const result = await submitRequestNumber(request_number);
+
+    res.status(200).json({
+      success: true,
+      message: "Update completed successfully",
+      type: type,
+      request_number: request_number
+    });
+  } catch (error) {
+    next(error);
+  }
+}
 
 
 module.exports = {
@@ -1538,5 +1557,6 @@ module.exports = {
   postmortemList,
   login,
   loginsession,
-  complaintList
+  complaintList,
+  updateStatus
 };

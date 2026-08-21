@@ -23,7 +23,7 @@ const LOC_HEADINGS = {
   totalliu: 'कुल एलआईयू पर लम्बित',
   totaldcrb: 'कुल डीसीआरबी पर लम्बित',
   totalps: 'कुल थानों पर लम्बित',
-  totalremain: 'समस्त पश्चिमी जोन पर लम्बित',
+  totalremain: 'समस्त लम्बित',
 };
 
 const STATUS_MAP = {

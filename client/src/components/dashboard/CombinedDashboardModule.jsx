@@ -65,15 +65,7 @@ export default function CombinedDashboardModule({ activeFilter, sdate, edate}) {
     }
   }
 
-  // function handleSearchSubmit(e) {
-  //   e.preventDefault();
-  //   if (!sdate || !edate) {
-  //     alert('कृपया दोनों दिनांक भरें');
-  //     return;
-  //   }
-  //   loadStationData(sdate, edate);
-  //   setShowSearch(false);
-  // }
+  
 
   function fmt(dateStr) {
     if (!dateStr) return '';
@@ -126,70 +118,101 @@ export default function CombinedDashboardModule({ activeFilter, sdate, edate}) {
 
             </tr>
           </thead>
-
           <tbody>
-            {loading && (
-              <tr><td colSpan="9" style={{ textAlign: 'center', padding: '20px' }}>लोड हो रहा है...</td></tr>
+  {loading && (
+    <tr>
+      <td colSpan="10" style={{ textAlign: 'center', padding: '20px' }}>
+        लोड हो रहा है...
+      </td>
+    </tr>
+  )}
+
+  {error && (
+    <tr>
+      <td colSpan="10" style={{ textAlign: 'center', color: 'red' }}>
+        {error}
+      </td>
+    </tr>
+  )}
+
+  {!loading &&
+    stationRows.map((r, i) => {
+      const map = {
+        Tenants: 'tenant',
+        Employee: 'employee',
+        Character: 'character',
+        Domestic: 'domestic',
+      };
+
+      const linkType = map[r.verification_type] || 'character';
+      const isTotal = r.verification_type === 'TOTAL';
+
+      // If TOTAL, show plain text; otherwise show Link
+      const renderValue = (value, loc) => {
+        const displayValue = value || 0;
+
+        if (isTotal) {
+          return displayValue;
+        }
+
+        return (
+          <Link
+            to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=${loc}`}
+          >
+            {displayValue}
+          </Link>
+        );
+      };
+
+      return (
+        <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
+          <td>{i + 1}</td>
+
+          <td style={{ fontWeight: '600' }}>
+            {r.verification_type}
+          </td>
+
+          <td className={getHighlightClass('all')}>
+            {renderValue(r.request_count || r.c_total, 'all')}
+          </td>
+
+          <td className={getHighlightClass('remain')}>
+            {renderValue(r.pending_count || r.c_remain, 'remain')}
+          </td>
+
+          <td className={getHighlightClass('ps')}>
+            {renderValue(r.pending_ps_count || r.c_station, 'ps')}
+          </td>
+
+          <td className={getHighlightClass('dcrb')}>
+            {renderValue(r.pending_dcrb_count || r.c_dcrb, 'dcrb')}
+          </td>
+
+          <td className={getHighlightClass('liu')}>
+            {renderValue(r.pending_liu_count || r.c_liu, 'liu')}
+          </td>
+
+          <td className={getHighlightClass('dcp')}>
+            {renderValue(r.pending_dcp_count || r.c_dcp, 'dcp')}
+          </td>
+
+          <td className={getHighlightClass('own_to_other')}>
+            {renderValue(
+              r.own_to_other || r.c_own_to_other,
+              'own_to_other'
             )}
-            {error && (
-              <tr><td colSpan="9" style={{ textAlign: 'center', color: 'red' }}>{error}</td></tr>
+          </td>
+
+          <td className={getHighlightClass('other_to_own')}>
+            {renderValue(
+              r.other_to_own || r.c_other_to_own,
+              'other_to_own'
             )}
-            {!loading && stationRows.map((r, i) => {
-              const map = {
-                'Tenants': 'tenant',
-                'Employee': 'employee',
-                'Character': 'character',
-                'Domestic': 'domestic',
-              };
-              const linkType = map[r.verification_type] || 'character';
-              return (
-                <tr key={i} className={i % 2 === 1 ? 'alt-row' : ''}>
-                  <td>{i + 1}</td>
-                  <td style={{ fontWeight: '600' }}>{r.verification_type}</td>
-                  <td className={getHighlightClass('all')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=all`}>
-                      {r.request_count || r.c_total || 0}
-                    </Link>
-                  </td>
-                  <td className={getHighlightClass('remain')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=remain`}>
-                      {r.pending_count || r.c_remain || 0}
-                    </Link>
-                  </td>
-                  <td className={getHighlightClass('ps')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=ps`}>
-                      {r.pending_ps_count || r.c_station || 0}
-                    </Link>
-                  </td>
-                  <td className={getHighlightClass('dcrb')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=dcrb`}>
-                      {r.pending_dcrb_count || r.c_dcrb || 0}
-                    </Link>
-                  </td>
-                  <td className={getHighlightClass('liu')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=liu`}>
-                      {r.pending_liu_count || r.c_liu || 0}
-                    </Link>
-                  </td>
-                  <td className={getHighlightClass('dcp')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=dcp`}>
-                      {r.pending_dcp_count || r.c_dcp || 0}
-                    </Link>
-                  </td>
-                  <td className={getHighlightClass('own_to_other')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=own_to_other`}>
-                      {r.own_to_other || r.c_own_to_other || 0}
-                    </Link>
-                  </td>
-                   <td className={getHighlightClass('other_to_own')}>
-                    <Link to={`/characters?type=${linkType}&sdate=${sdate}&edate=${edate}&loc=other_to_own`}>
-                      {r.other_to_own || r.c_other_to_own || 0}
-                    </Link>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
+          </td>
+        </tr>
+      );
+    })}
+</tbody>
         </table>
       </div>
     </div>

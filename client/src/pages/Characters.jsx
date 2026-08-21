@@ -5,7 +5,7 @@ import Navbar from '../components/Navbar';
 import {formatDate} from '../utils/dataConvertor';
 import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
-
+import UpdateButton from "../components/UpdateButton"
 
 const MODULE_NAMES = {
   character: 'चरित्र प्रमाण पत्र',
@@ -22,7 +22,7 @@ const LOC_HEADINGS = {
   totalliu:     'कुल एलआईयू पर लम्बित',
   totaldcrb:    'कुल डीसीआरबी पर लम्बित',
   totalps:      'कुल थानों पर लम्बित',
-  totalremain:  'समस्त पश्चिमी जोन पर लम्बित',
+  totalremain:  'समस्त लम्बित',
   totaldiff:    'अन्य थानों से सम्बन्धित लम्बित',
   OTHER_TO_OWN_PS: 'अन्य थानों से सम्बन्धित लम्बित',
   
@@ -62,7 +62,7 @@ export default function Characters({
 }) {
   const [searchParams] = useSearchParams();
   const loc = searchParams.get('loc') || '';
-  const type = searchParams.get('type') || 'character';
+  const type = searchParams.get('type') || '';
   const days = searchParams.get('days') || '';
   const stationParam = searchParams.get('ps') || searchParams.get('station') || '';
 
@@ -118,7 +118,7 @@ export default function Characters({
           if (prev.length > 0 && selectedPoliceStation) return prev;
           return stations.length > 0 ? stations : prev;
         });
-        console.log(" res.data ", res.data);
+        // console.log(" res.data ", res.data);
 
       } catch (e) {
         setError(e.response?.data?.error || e.message);
@@ -126,7 +126,7 @@ export default function Characters({
         setLoading(false);
       }
     };
-    console.log("hidePreAdd ", hidePreAdd(type));
+    // console.log("hidePreAdd ", hidePreAdd(type));
 
     fetchData();
   }, [loc, type, sdate, edate, selectedPoliceStation, days]);
@@ -138,6 +138,7 @@ export default function Characters({
   const hideStatusCol = hideStatus(loc);
   const hidePraAddCol = hidePraAdd(loc);
   const hidePreAddCol = hidePreAdd(type);
+
 
 
   return (
@@ -171,6 +172,7 @@ export default function Characters({
               {!hidePreAddCol ?  <th> PRESENT ADD STATUS</th> :  <th> STATUS</th> }
               {!hidePraAddCol && <th>PERMANENT ADDRESS</th>}
               {!hideStatusCol && <th> PERMANENT ADD STATUS</th>}
+              <th>Status Update</th>
             </tr>
           </thead>
           <tbody id="pending_Details">
@@ -192,6 +194,7 @@ export default function Characters({
 
                 {!hidePraAddCol && <td>{ r.permanent_address}</td>}
                 {!hideStatusCol && <td>{ r.per_Current_Status}</td>}
+                <td> <UpdateButton type={type} request_number={r.request_number}/></td>
               </tr>
             ))}
           </tbody>

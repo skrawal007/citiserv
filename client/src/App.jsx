@@ -21,6 +21,7 @@ export default function App() {
   const [sdate, setSdate] = useState(getDateString(oneMonthAgo));
   const [edate, setEdate] = useState(getDateString(today));
   const [showSearch, setShowSearch] = useState(false);
+  
   return (
     <AuthProvider>
       <BrowserRouter>

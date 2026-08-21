@@ -3,15 +3,9 @@ const upload = require('../middlewares/uploadMiddleware');
 
 
 const {
-  getMinDate,
-  getMaxDate,
   Dashboard,
   combinedDashbaord,
   PendingDurationSummary,
-  getDashboardByDate,
-  getPending,
-  getDetails,
-  getRemain,
   uploadFile,
   characterList,
   employeeList,
@@ -20,7 +14,8 @@ const {
   complaintList,
   postmortemList,
   login,  
-  loginsession
+  loginsession,
+  updateStatus
 } = require('../controllers/characterController');
 
 const authMiddleware = require("../auth/authMiddleware");
@@ -39,5 +34,6 @@ router.get('/postmortemList', authMiddleware, postmortemList);
 router.post('/upload', upload.single('excel_file'), uploadFile);
 router.post('/login',login);
 router.get('/login',loginsession);
+router.get('/updateStatus', authMiddleware,updateStatus);
 
 module.exports = router;

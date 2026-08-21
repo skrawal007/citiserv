@@ -5,7 +5,7 @@ import Navbar from "../components/Navbar";
 import AgingSummaryTable from "../components/dashboard/AgingSummaryTable";
 import CharacterModule from "../components/dashboard/CharacterModule";
 import CombinedDashboardModule from "../components/dashboard/CombinedDashboardModule";
-import ComplaintModule from "../components/dashboard/ComplaintModule";
+// import ComplaintModule from "../components/dashboard/ComplaintModule";
 import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
 
@@ -145,7 +145,7 @@ export default function Dashboard({
                 <>
                   <CombinedDashboardModule activeFilter={activeFilter}   sdate={sdate} edate={edate}/>
 
-                  <AgingSummaryTable/>
+                  <AgingSummaryTable  sdate={sdate} setSdate={setSdate} edate={edate} setEdate={setEdate} />
                 </>
               )}
             </>

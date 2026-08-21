@@ -11,6 +11,20 @@ export default function Navbar() {
   const currentType = searchParams.get('type') || '';
   const currentLoc = searchParams.get('loc') || '';
 
+  // Normalise short dashboard loc aliases → long navbar loc aliases so
+  // `active-sub` highlighting works for both manually-chosen nav links
+  // and dashboard drill-down links.
+  const LOC_ALIAS = {
+    ps:           'totalps',
+    liu:          'totalliu',
+    dcrb:         'totaldcrb',
+    dcp:          'totaldcp',
+    remain:       'totalremain',
+    own_to_other: 'totaldiff',
+    other_to_own: 'OTHER_TO_OWN_PS',
+  };
+  const normLoc = LOC_ALIAS[currentLoc] || currentLoc;
+
   const isDashboardActive = currentPath === '/dashboard';
   const isUploadActive = currentPath === '/upload';
   const isCharacterActive = currentPath === '/characters' && (currentType === 'character' || !currentType);
@@ -19,6 +33,7 @@ export default function Navbar() {
   const isDomesticActive = currentPath === '/characters' && currentType === 'domestic';
   const isComplaintsActive = currentPath === '/characters' && currentType === 'complaint';
   const isPostmortemActive = currentPath === '/characters' && currentType === 'postmortem';
+
  
 
   const handleLogout = () => {
@@ -86,22 +101,22 @@ export default function Navbar() {
           <li className={isCharacterActive ? 'active-menu' : ''}>
             <Link to="/characters?type=character&loc=totalremain" className="menu-title">🛡️ Character</Link>
             <ul>
-              <li className={isCharacterActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+              <li className={isCharacterActive && normLoc === 'totalps' ? 'active-sub' : ''}>
                 <Link to="/characters?type=character&loc=totalps">STATION (थाना)</Link>
               </li>
-              <li className={isCharacterActive && currentLoc === 'totalliu' ? 'active-sub' : ''}>
+              <li className={isCharacterActive && normLoc === 'totalliu' ? 'active-sub' : ''}>
                 <Link to="/characters?type=character&loc=totalliu">LIU (एलआईयू)</Link>
               </li>
-              <li className={isCharacterActive && currentLoc === 'totaldcrb' ? 'active-sub' : ''}>
+              <li className={isCharacterActive && normLoc === 'totaldcrb' ? 'active-sub' : ''}>
                 <Link to="/characters?type=character&loc=totaldcrb">DCRB (डीसीआरबी)</Link>
               </li>
-              <li className={isCharacterActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
+              <li className={isCharacterActive && normLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=character&loc=totaldcp">DCP (डीसीपी)</Link>
               </li>
-              <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+              <li className={isCharacterActive && normLoc === 'totaldiff' ? 'active-sub' : ''}>
                 <Link to="/characters?type=character&loc=totaldiff">Own PS → Other PS</Link>
               </li>
-               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+               <li className={isCharacterActive && normLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
                 <Link to="/characters?type=character&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
               </li>
             </ul>
@@ -110,22 +125,22 @@ export default function Navbar() {
           <li className={isEmployeeActive ? 'active-menu' : ''}>
             <Link to="/characters?type=employee&loc=totalremain" className="menu-title">💼 Employee</Link>
             <ul>
-              <li className={isEmployeeActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+              <li className={isEmployeeActive && normLoc === 'totalps' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=totalps">STATION (थाना)</Link>
               </li>
-              <li className={isEmployeeActive && currentLoc === 'totalliu' ? 'active-sub' : ''}>
+              <li className={isEmployeeActive && normLoc === 'totalliu' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=totalliu">LIU (एलआईयू)</Link>
               </li>
-              <li className={isEmployeeActive && currentLoc === 'totaldcrb' ? 'active-sub' : ''}>
+              <li className={isEmployeeActive && normLoc === 'totaldcrb' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=totaldcrb">DCRB (डीसीआरबी)</Link>
               </li>
-              <li className={isEmployeeActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
+              <li className={isEmployeeActive && normLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=totaldcp">DCP (डीसीपी)</Link>
               </li>
-              <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+              <li className={isEmployeeActive && normLoc === 'totaldiff' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=totaldiff">Own PS → Other PS</Link>
               </li>
-               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+               <li className={isEmployeeActive && normLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
                 <Link to="/characters?type=employee&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
               </li>
             </ul>
@@ -134,22 +149,22 @@ export default function Navbar() {
           <li className={isTenantActive ? 'active-menu' : ''}>
             <Link to="/characters?type=tenant&loc=totalremain" className="menu-title">🏠 Tenant</Link>
             <ul>
-              <li className={isTenantActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+              <li className={isTenantActive && normLoc === 'totalps' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=totalps">STATION (थाना)</Link>
               </li>
-              <li className={isTenantActive && currentLoc === 'totalliu' ? 'active-sub' : ''}>
+              <li className={isTenantActive && normLoc === 'totalliu' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=totalliu">LIU (एलआईयू)</Link>
               </li>
-              <li className={isTenantActive && currentLoc === 'totaldcrb' ? 'active-sub' : ''}>
+              <li className={isTenantActive && normLoc === 'totaldcrb' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=totaldcrb">DCRB (डीसीआरबी)</Link>
               </li>
-              <li className={isTenantActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
+              <li className={isTenantActive && normLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=totaldcp">DCP (डीसीपी)</Link>
               </li>
-                <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+                <li className={isTenantActive && normLoc === 'totaldiff' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=totaldiff">Own PS → Other PS</Link>
               </li>
-               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+               <li className={isTenantActive && normLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
                 <Link to="/characters?type=tenant&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
               </li>
             </ul>
@@ -158,22 +173,22 @@ export default function Navbar() {
           <li className={isDomesticActive ? 'active-menu' : ''}>
             <Link to="/characters?type=domestic&loc=totalremain" className="menu-title">🧹 Domestic</Link>
             <ul>
-              <li className={isDomesticActive && currentLoc === 'totalps' ? 'active-sub' : ''}>
+              <li className={isDomesticActive && normLoc === 'totalps' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&loc=totalps">STATION (थाना)</Link>
               </li>
-              <li className={isDomesticActive && currentLoc === 'totalliu' ? 'active-sub' : ''}>
+              <li className={isDomesticActive && normLoc === 'totalliu' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&loc=totalliu">LIU (एलआईयू)</Link>
               </li>
-              <li className={isDomesticActive && currentLoc === 'totaldcrb' ? 'active-sub' : ''}>
+              <li className={isDomesticActive && normLoc === 'totaldcrb' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&loc=totaldcrb">DCRB (डीसीआरबी)</Link>
               </li>
-              <li className={isDomesticActive && currentLoc === 'totaldcp' ? 'active-sub' : ''}>
+              <li className={isDomesticActive && normLoc === 'totaldcp' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&loc=totaldcp">DCP (डीसीपी)</Link>
               </li>
-              <li className={isCharacterActive && currentLoc === 'totaldiff' ? 'active-sub' : ''}>
+              <li className={isDomesticActive && normLoc === 'totaldiff' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&&loc=totaldiff">Own PS → Other PS</Link>
               </li>
-               <li className={isCharacterActive && currentLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
+               <li className={isDomesticActive && normLoc === 'OTHER_TO_OWN_PS' ? 'active-sub' : ''}>
                 <Link to="/characters?type=domestic&&loc=OTHER_TO_OWN_PS">Other PS → Own PS</Link>
               </li>
               
