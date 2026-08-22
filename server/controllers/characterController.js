@@ -1,9 +1,12 @@
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const { pool } = require('../database/db');
-const { processExcelBuffer } = require('../utils/excelParser');
-const mysql =require('mysql2/promise');
-const {submitRequestNumber,parseCurrentStatus} = require("../utils/statusChecker");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const { pool } = require("../database/db");
+const { processExcelBuffer } = require("../utils/excelParser");
+const mysql = require("mysql2/promise");
+const {
+  submitRequestNumber,
+  parseCurrentStatus,
+} = require("../utils/statusChecker");
 
 const {
   PS_STATUSES,
@@ -11,8 +14,7 @@ const {
   DCRB_STATUSES,
   DCP_STATUSES,
   makePlaceholders,
-} = require('../constants/statusConstants');
-
+} = require("../constants/statusConstants");
 
 const conditions = {
   all: "1=1",
@@ -21,8 +23,10 @@ const conditions = {
   dcrb: "pre_Current_Status LIKE '%DCRB%'",
   liu: "pre_Current_Status LIKE '%LIU%'",
   dcp: "pre_Current_Status ='DCP'",
-  own_to_other: "pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
-  other_to_own: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+  own_to_other:
+    "pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')",
+  other_to_own:
+    "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
 
   totaldcp: "pre_Current_Status ='DCP'",
   totalliu: "pre_Current_Status LIKE '%LIU%'",
@@ -31,33 +35,46 @@ const conditions = {
   totalremain: ` ((pre_Current_Status NOT IN ('APPROVED', 'REJECTED') AND per_Current_Status IS NULL)
   OR( pre_Current_Status NOT IN ('APPROVED', 'REJECTED')  AND per_Current_Status NOT IN ('APPROVED', 'REJECTED')))`,
   totaldiff: `pre_station_code <> per_station_code AND pre_Current_Status NOT IN ('APPROVED', 'REJECTED')`,
-  OTHER_TO_OWN_PS: "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
+  OTHER_TO_OWN_PS:
+    "per_Current_Status NOT IN ('APPROVED', 'REJECTED') AND pre_station_code <> per_station_code",
 };
 
 const characterList = async (req, res, next) => {
   try {
     // console.log("Character list req.query ", req.query);
     const { loc, sdate, edate, ps, days } = req.query;
-    const { userid,usertype } = req.user;
+    const { userid, usertype } = req.user;
+    let userTypeCondtion = "";
     console.log(" userid ", userid, " usertype ", usertype);
+
     if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
+      return res.status(400).json({ error: "loc parameter is required" });
+    }
+
+    if (usertype == "5") {
+      userTypeCondtion = "user_district.user_id";
+    } else if (usertype == "1") {
+      userTypeCondtion = "user_station.user_id";
     }
 
     const condition = conditions[loc];
     if (!condition) {
-      return res.status(400).json({ error: 'Invalid list location' });
+      return res.status(400).json({ error: "Invalid list location" });
     }
 
-    const characterUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
-    const stationColumn = characterUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+    const characterUsesPermanentDistrict =
+      loc === "OTHER_TO_OWN_PS" || loc === "other_to_own";
+    const stationColumn = characterUsesPermanentDistrict
+      ? "per_station_code"
+      : "pre_station_code";
 
     let query = `
       SELECT characters.* FROM characters 
-      JOIN station_ ON station_.code = characters.${stationColumn}
-      JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id = district_.id
-      WHERE ${condition} AND user_district.user_id = ?
+      LEFT JOIN station_ ON station_.code = characters.${stationColumn}
+      LEFT JOIN district_ ON district_.code = station_.district_code
+      LEFT JOIN user_station ON user_station.station_id = station_.id
+      LEFT JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${userTypeCondtion} = ? AND ${condition} 
     `;
     const params = [userid];
 
@@ -72,17 +89,17 @@ const characterList = async (req, res, next) => {
     }
 
     if (days) {
-      if (days === '0-15') {
+      if (days === "0-15") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
-      } else if (days === '16-30') {
+      } else if (days === "16-30") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
-      } else if (days === '31-90') {
+      } else if (days === "31-90") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
-      } else if (days === '91-180') {
+      } else if (days === "91-180") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
-      } else if (days === '181-365') {
+      } else if (days === "181-365") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
-      } else if (days === '365+') {
+      } else if (days === "365+") {
         query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
       }
     }
@@ -90,11 +107,11 @@ const characterList = async (req, res, next) => {
     query += ` ORDER BY pre_station_name, request_date;`;
 
     const [rows] = await pool.execute(query, params);
-     console.log(mysql.format(query, params));
+    //  console.log(mysql.format(query, params));
 
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching character list:', err);
+    console.error("Error fetching character list:", err);
     return next(err);
   }
 };
@@ -103,26 +120,38 @@ const employeeList = async (req, res, next) => {
   try {
     console.log("Employee list req.query ", req.query);
     const { loc, sdate, edate, ps, days } = req.query;
-    const { userid } = req.user;
+    const { userid, usertype } = req.user;
+    let userTypeCondtion = "";
+    console.log(" userid ", userid, " usertype ", usertype);
 
     if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
+      return res.status(400).json({ error: "loc parameter is required" });
+    }
+
+    if (usertype == "5") {
+      userTypeCondtion = "user_district.user_id";
+    } else if (usertype == "1") {
+      userTypeCondtion = "user_station.user_id";
     }
 
     const condition = conditions[loc];
     if (!condition) {
-      return res.status(400).json({ error: 'Invalid list location' });
+      return res.status(400).json({ error: "Invalid list location" });
     }
-  
-    const employeeUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
-    const stationColumn = employeeUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+    const employeeUsesPermanentDistrict =
+      loc === "OTHER_TO_OWN_PS" || loc === "other_to_own";
+    const stationColumn = employeeUsesPermanentDistrict
+      ? "per_station_code"
+      : "pre_station_code";
 
     let query = `
       SELECT employees.* FROM employees 
-      JOIN station_ ON station_.code = employees.${stationColumn}
-      JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id = district_.id
-      WHERE ${condition} AND user_district.user_id = ?
+      LEFT JOIN station_ ON station_.code = employees.${stationColumn}
+      LEFT JOIN district_ ON district_.code = station_.district_code
+      LEFT JOIN user_station ON user_station.station_id = station_.id
+      LEFT JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${userTypeCondtion} = ? AND ${condition} 
     `;
     const params = [userid];
 
@@ -137,17 +166,17 @@ const employeeList = async (req, res, next) => {
     }
 
     if (days) {
-      if (days === '0-15') {
+      if (days === "0-15") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
-      } else if (days === '16-30') {
+      } else if (days === "16-30") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
-      } else if (days === '31-90') {
+      } else if (days === "31-90") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
-      } else if (days === '91-180') {
+      } else if (days === "91-180") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
-      } else if (days === '181-365') {
+      } else if (days === "181-365") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
-      } else if (days === '365+') {
+      } else if (days === "365+") {
         query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
       }
     }
@@ -158,7 +187,7 @@ const employeeList = async (req, res, next) => {
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching employee list:', err);
+    console.error("Error fetching employee list:", err);
     return next(err);
   }
 };
@@ -167,26 +196,39 @@ const tenantList = async (req, res, next) => {
   try {
     console.log("Tenant list req.query ", req.query);
     const { loc, sdate, edate, ps, days } = req.query;
-    const { userid } = req.user;
+
+    const { userid, usertype } = req.user;
+    let userTypeCondtion = "";
+    console.log(" userid ", userid, " usertype ", usertype);
 
     if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
+      return res.status(400).json({ error: "loc parameter is required" });
+    }
+
+    if (usertype == "5") {
+      userTypeCondtion = "user_district.user_id";
+    } else if (usertype == "1") {
+      userTypeCondtion = "user_station.user_id";
     }
 
     const condition = conditions[loc];
     if (!condition) {
-      return res.status(400).json({ error: 'Invalid list location' });
+      return res.status(400).json({ error: "Invalid list location" });
     }
-  
-    const tenantsUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
-    const stationColumn = tenantsUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+    const tenantsUsesPermanentDistrict =
+      loc === "OTHER_TO_OWN_PS" || loc === "other_to_own";
+    const stationColumn = tenantsUsesPermanentDistrict
+      ? "per_station_code"
+      : "pre_station_code";
 
     let query = `
       SELECT tenants.* FROM tenants 
-      JOIN station_ ON station_.code = tenants.${stationColumn}
-      JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id = district_.id
-      WHERE ${condition} AND user_district.user_id = ?
+      LEFT JOIN station_ ON station_.code = tenants.${stationColumn}
+      LEFT JOIN district_ ON district_.code = station_.district_code
+      LEFT JOIN user_station ON user_station.station_id = station_.id
+      LEFT JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${userTypeCondtion} = ? AND ${condition} 
     `;
     const params = [userid];
 
@@ -201,17 +243,17 @@ const tenantList = async (req, res, next) => {
     }
 
     if (days) {
-      if (days === '0-15') {
+      if (days === "0-15") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
-      } else if (days === '16-30') {
+      } else if (days === "16-30") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
-      } else if (days === '31-90') {
+      } else if (days === "31-90") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
-      } else if (days === '91-180') {
+      } else if (days === "91-180") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
-      } else if (days === '181-365') {
+      } else if (days === "181-365") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
-      } else if (days === '365+') {
+      } else if (days === "365+") {
         query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
       }
     }
@@ -222,7 +264,7 @@ const tenantList = async (req, res, next) => {
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching tenant list:', err);
+    console.error("Error fetching tenant list:", err);
     return next(err);
   }
 };
@@ -231,25 +273,38 @@ const domesticList = async (req, res, next) => {
   try {
     console.log("Domestic list req.query ", req.query);
     const { loc, sdate, edate, ps, days } = req.query;
-    const { userid } = req.user;
+    const { userid, usertype } = req.user;
+    let userTypeCondtion = "";
+    console.log(" userid ", userid, " usertype ", usertype);
+
     if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
+      return res.status(400).json({ error: "loc parameter is required" });
+    }
+
+    if (usertype == "5") {
+      userTypeCondtion = "user_district.user_id";
+    } else if (usertype == "1") {
+      userTypeCondtion = "user_station.user_id";
     }
 
     const condition = conditions[loc];
     if (!condition) {
-      return res.status(400).json({ error: 'Invalid list location' });
+      return res.status(400).json({ error: "Invalid list location" });
     }
-  
-    const domesticUsesPermanentDistrict = loc === 'OTHER_TO_OWN_PS' || loc === 'other_to_own'; 
-    const stationColumn = domesticUsesPermanentDistrict ? 'per_station_code' : 'pre_station_code';
+
+    const domesticUsesPermanentDistrict =
+      loc === "OTHER_TO_OWN_PS" || loc === "other_to_own";
+    const stationColumn = domesticUsesPermanentDistrict
+      ? "per_station_code"
+      : "pre_station_code";
 
     let query = `
       SELECT domestic.* FROM domestic 
-      JOIN station_ ON station_.code = domestic.${stationColumn}
-      JOIN district_ ON district_.code = station_.district_code
-      JOIN user_district ON user_district.district_id = district_.id
-      WHERE ${condition} AND user_district.user_id = ?
+      LEFT JOIN station_ ON station_.code = domestic.${stationColumn}
+      LEFT JOIN district_ ON district_.code = station_.district_code
+      LEFT JOIN user_station ON user_station.station_id = station_.id
+      LEFT JOIN user_district ON user_district.district_id = district_.id
+      WHERE ${userTypeCondtion} = ? AND ${condition} 
     `;
     const params = [userid];
 
@@ -264,17 +319,17 @@ const domesticList = async (req, res, next) => {
     }
 
     if (days) {
-      if (days === '0-15') {
+      if (days === "0-15") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
-      } else if (days === '16-30') {
+      } else if (days === "16-30") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
-      } else if (days === '31-90') {
+      } else if (days === "31-90") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
-      } else if (days === '91-180') {
+      } else if (days === "91-180") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
-      } else if (days === '181-365') {
+      } else if (days === "181-365") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
-      } else if (days === '365+') {
+      } else if (days === "365+") {
         query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
       }
     }
@@ -285,7 +340,7 @@ const domesticList = async (req, res, next) => {
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching domestic list:', err);
+    console.error("Error fetching domestic list:", err);
     return next(err);
   }
 };
@@ -296,7 +351,7 @@ const complaintList = async (req, res, next) => {
     const { loc, sdate, edate, ps, days } = req.query;
     const { userid } = req.user;
     if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
+      return res.status(400).json({ error: "loc parameter is required" });
     }
 
     const localConditions = {
@@ -306,12 +361,12 @@ const complaintList = async (req, res, next) => {
       totaldcp: "pre_Current_Status ='DCP'",
       totalremain: "pre_Current_Status NOT IN ('FINISHED', 'REJECTED')",
     };
-    
+
     const condition = localConditions[loc];
     if (!condition) {
-      return res.status(400).json({ error: 'Invalid list location' });
+      return res.status(400).json({ error: "Invalid list location" });
     }
-  
+
     let query = `
       SELECT 
         complaints.district_code AS pre_district_code,
@@ -338,17 +393,17 @@ const complaintList = async (req, res, next) => {
     }
 
     if (days) {
-      if (days === '0-15') {
+      if (days === "0-15") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
-      } else if (days === '16-30') {
+      } else if (days === "16-30") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
-      } else if (days === '31-90') {
+      } else if (days === "31-90") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
-      } else if (days === '91-180') {
+      } else if (days === "91-180") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
-      } else if (days === '181-365') {
+      } else if (days === "181-365") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
-      } else if (days === '365+') {
+      } else if (days === "365+") {
         query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
       }
     }
@@ -359,7 +414,7 @@ const complaintList = async (req, res, next) => {
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching complaint list:', err);
+    console.error("Error fetching complaint list:", err);
     return next(err);
   }
 };
@@ -370,7 +425,7 @@ const postmortemList = async (req, res, next) => {
     const { loc, sdate, edate, ps, days } = req.query;
     const { userid } = req.user;
     if (!loc) {
-      return res.status(400).json({ error: 'loc parameter is required' });
+      return res.status(400).json({ error: "loc parameter is required" });
     }
 
     const localConditions = {
@@ -383,9 +438,9 @@ const postmortemList = async (req, res, next) => {
 
     const condition = localConditions[loc];
     if (!condition) {
-      return res.status(400).json({ error: 'Invalid list location' });
+      return res.status(400).json({ error: "Invalid list location" });
     }
-  
+
     let query = `
       SELECT 
         postmortem.district_code AS pre_district_code,
@@ -412,17 +467,17 @@ const postmortemList = async (req, res, next) => {
     }
 
     if (days) {
-      if (days === '0-15') {
+      if (days === "0-15") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 0 AND 15`;
-      } else if (days === '16-30') {
+      } else if (days === "16-30") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 16 AND 30`;
-      } else if (days === '31-90') {
+      } else if (days === "31-90") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 31 AND 90`;
-      } else if (days === '91-180') {
+      } else if (days === "91-180") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 91 AND 180`;
-      } else if (days === '181-365') {
+      } else if (days === "181-365") {
         query += ` AND DATEDIFF(CURDATE(), request_date) BETWEEN 181 AND 365`;
-      } else if (days === '365+') {
+      } else if (days === "365+") {
         query += ` AND DATEDIFF(CURDATE(), request_date) > 365`;
       }
     }
@@ -433,34 +488,47 @@ const postmortemList = async (req, res, next) => {
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
-    console.error('Error fetching postmortem list:', err);
+    console.error("Error fetching postmortem list:", err);
     return next(err);
   }
 };
 
-
 const Dashboard = async (req, res, next) => {
-  console.log('Dashboard request received with query:', req.query);
+  console.log("Dashboard request received with query:", req.query);
 
   try {
     const { type, sdate, edate } = req.query;
-    const { userid } = req.user;
+    const { userid, usertype } = req.user;
+    let userTypeCondition = "";
 
     // ---------------------------------------------------------
     // 1. Validate / select table
     // ---------------------------------------------------------
     const tableMap = {
-      employee: 'employees',
-      character: 'characters',
-      tenant: 'tenants',
-      domestic: 'domestic'
+      employee: "employees",
+      character: "characters",
+      tenant: "tenants",
+      domestic: "domestic",
     };
+
+
+    if(usertype==5){
+      userTypeCondition=` 
+          INNER JOIN district_ d ON d.code = s.district_code
+          INNER JOIN user_district ud ON ud.district_id = d.id
+           WHERE ud.user_id = ?
+`;
+    } else 
+    if(usertype==1){
+      userTypeCondition=`inner join user_station  ON user_station.station_id=s.id
+        WHERE user_station.user_id = ?`;
+    }
 
     const tableType = tableMap[type];
 
     if (!tableType) {
       return res.json({
-        stationRows: []
+        stationRows: [],
       });
     }
 
@@ -475,7 +543,7 @@ const Dashboard = async (req, res, next) => {
     //
     // This includes the complete end date.
     //
-    let dateCondition = '';
+    let dateCondition = "";
     let dateParams = [];
 
     if (sdate && edate) {
@@ -509,19 +577,9 @@ const Dashboard = async (req, res, next) => {
         SELECT DISTINCT
           s.name AS pre_station_name,
           s.code AS pre_station_code
-
         FROM station_ s
-
-        INNER JOIN district_ d
-          ON d.code = s.district_code
-
-        INNER JOIN user_district ud
-          ON ud.district_id = d.id
-
-        WHERE ud.user_id = ?
-
+          ${userTypeCondition}
       ),
-
       outgoing AS (
 
         SELECT
@@ -718,30 +776,20 @@ const Dashboard = async (req, res, next) => {
     //     sdate
     //     edate
     //
-    const params = [
-      userid,
-      ...dateParams,
-      ...dateParams
-    ];
+    const params = [userid, ...dateParams, ...dateParams];
 
-    // console.log(
-    //   'Dashboard SQL:',
-    //   mysql.format(query, params)
-    // );
+    // console.log("Dashboard SQL:", mysql.format(query, params));
 
     // ---------------------------------------------------------
     // 5. Execute query
     // ---------------------------------------------------------
-    const [stationRows] = await pool.execute(
-      query,
-      params
-    );
+    const [stationRows] = await pool.execute(query, params);
 
     // ---------------------------------------------------------
     // 6. Create TOTAL row
     // ---------------------------------------------------------
     const totalRow = {
-      pre_station_name: 'TOTAL',
+      pre_station_name: "TOTAL",
       isTotal: true,
       pre_station_code: null,
 
@@ -756,86 +804,78 @@ const Dashboard = async (req, res, next) => {
       pending_dcp_count: 0,
 
       own_to_other: 0,
-      other_to_own: 0
+      other_to_own: 0,
     };
 
     // ---------------------------------------------------------
     // 7. Calculate totals
     // ---------------------------------------------------------
     stationRows.forEach((row) => {
+      totalRow.request_count += Number(row.request_count || 0);
 
-      totalRow.request_count += Number(
-        row.request_count || 0
-      );
+      totalRow.approved_count += Number(row.approved_count || 0);
 
-      totalRow.approved_count += Number(
-        row.approved_count || 0
-      );
+      totalRow.rejected_count += Number(row.rejected_count || 0);
 
-      totalRow.rejected_count += Number(
-        row.rejected_count || 0
-      );
+      totalRow.pending_count += Number(row.pending_count || 0);
 
-      totalRow.pending_count += Number(
-        row.pending_count || 0
-      );
+      totalRow.pending_ps_count += Number(row.pending_ps_count || 0);
 
-      totalRow.pending_ps_count += Number(
-        row.pending_ps_count || 0
-      );
+      totalRow.pending_dcrb_count += Number(row.pending_dcrb_count || 0);
 
-      totalRow.pending_dcrb_count += Number(
-        row.pending_dcrb_count || 0
-      );
+      totalRow.pending_liu_count += Number(row.pending_liu_count || 0);
 
-      totalRow.pending_liu_count += Number(
-        row.pending_liu_count || 0
-      );
+      totalRow.pending_dcp_count += Number(row.pending_dcp_count || 0);
 
-      totalRow.pending_dcp_count += Number(
-        row.pending_dcp_count || 0
-      );
+      totalRow.own_to_other += Number(row.own_to_other || 0);
 
-      totalRow.own_to_other += Number(
-        row.own_to_other || 0
-      );
-
-      totalRow.other_to_own += Number(
-        row.other_to_own || 0
-      );
+      totalRow.other_to_own += Number(row.other_to_own || 0);
     });
 
     // ---------------------------------------------------------
     // 8. Add TOTAL at bottom
     // ---------------------------------------------------------
-    stationRows.push(totalRow);
+    // stationRows.push(totalRow);
+     // Add total row at the end
+    usertype == 1 ? "" :  stationRows.push(totalRow);
 
     // ---------------------------------------------------------
     // 9. Response
     // ---------------------------------------------------------
     return res.json({
-      stationRows
+      stationRows,
     });
-
   } catch (err) {
-    console.error(
-      'Dashboard Error:',
-      err
-    );
+    console.error("Dashboard Error:", err);
 
     next(err);
   }
 };
 
 const combinedDashbaord = async (req, res, next) => {
-  console.log('Combined Dashboard request received with query:', req.query);
+  console.log("Combined Dashboard request received with query:", req.query);
   // console.log("TOKEN USER DATA:", req.user);
-  try{
-
+  try {
     const { type, sdate, edate } = req.query;
-    const { userid } = req.user;
-    
-let query =`WITH verification_types AS (
+    const { userid,usertype } = req.user;
+    let whereCondition = '';
+    if(usertype ==1 ){
+      whereCondition =`
+    JOIN station_ ON station_.code = vr.per_station_code
+    JOIN user_station ON user_station.station_id = station_.id
+    WHERE user_station.user_id = ?`
+
+    }else if (usertype == 5){
+      whereCondition=`   JOIN district_ d ON d.code = vr.pre_district_code
+    JOIN user_district ud ON ud.district_id = d.id
+    WHERE ud.user_id = ? `
+
+    }
+
+
+    console.log("combinedDashbaord userid ", userid, " usertype ", usertype);
+
+    let query =`WITH verification_types AS (
     SELECT 'Tenants' AS verification_type
     UNION ALL
     SELECT 'Employee'
@@ -851,6 +891,7 @@ verification_records AS (
         request_date,
         pre_district_code,
         per_district_code,
+        per_station_code,
         pre_Current_Status,
         per_Current_Status
     FROM tenants
@@ -862,6 +903,7 @@ verification_records AS (
         request_date,
         pre_district_code,
         per_district_code,
+        per_station_code,
         pre_Current_Status,
         per_Current_Status
     FROM employees
@@ -873,6 +915,7 @@ verification_records AS (
         request_date,
         pre_district_code,
         per_district_code,
+        per_station_code,
         pre_Current_Status,
         per_Current_Status
     FROM characters
@@ -884,6 +927,7 @@ verification_records AS (
         request_date,
         pre_district_code,
         per_district_code,
+        per_station_code,
         pre_Current_Status,
         per_Current_Status
     FROM domestic
@@ -958,16 +1002,10 @@ outgoing AS (
         ) AS own_to_other
 
     FROM verification_records vr
+  ${whereCondition}
 
-    JOIN district_ d
-        ON d.code = vr.pre_district_code
-
-    JOIN user_district ud
-        ON ud.district_id = d.id
-
-    WHERE ud.user_id = ?
       AND vr.request_date >= ?
-      AND vr.request_date <= ?
+      AND vr.request_date < ?
 
     GROUP BY vr.verification_type
 ),
@@ -979,17 +1017,9 @@ incoming AS (
         COUNT(*) AS other_to_own
 
     FROM verification_records vr
-
-    JOIN district_ d
-        ON d.code = vr.per_district_code
-
-    JOIN user_district ud
-        ON ud.district_id = d.id
-
-    WHERE ud.user_id = ?
-
-      AND vr.request_date >= ?
-      AND vr.request_date <= ?
+      ${whereCondition}
+      AND vr.request_date >=  ?     
+       AND vr.request_date < ?
 
       AND vr.per_Current_Status IS NOT NULL
 
@@ -1010,10 +1040,12 @@ SELECT
     COALESCE(o.approved_count, 0) AS approved_count,
     COALESCE(o.rejected_count, 0) AS rejected_count,
     COALESCE(o.pending_count, 0) AS pending_count,
+
     COALESCE(o.pending_ps_count, 0) AS pending_ps_count,
     COALESCE(o.pending_dcrb_count, 0) AS pending_dcrb_count,
     COALESCE(o.pending_liu_count, 0) AS pending_liu_count,
     COALESCE(o.pending_dcp_count, 0) AS pending_dcp_count,
+
     COALESCE(o.own_to_other, 0) AS own_to_other,
     COALESCE(i.other_to_own, 0) AS other_to_own
 
@@ -1026,81 +1058,81 @@ LEFT JOIN incoming i
     ON i.verification_type = vt.verification_type
 
 ORDER BY
-    vt.verification_type`;
+    vt.verification_type;`;
 
-// console.log(mysql.format(query, [ 
-// userid,
-//   sdate,
-//   edate,
-//   userid,
-//   sdate,
-//   edate
-// ]));    
+    // console.log(mysql.format(query, [
+    // userid,
+    //   sdate,
+    //   edate,
+    //   userid,
+    //   sdate,
+    //   edate
+    // ]));
 
-const [result] = await pool.execute(query, [  
-  userid,
-  sdate,
-  edate,
-  userid,
-  sdate,
-  edate]);
+    const [result] = await pool.execute(query, [
+      userid,
+      sdate,
+      edate,
+      userid,
+      sdate,
+      edate,
+    ]);
+
+    // Calculate total row
+    const totalRow = {
+      verification_type: "TOTAL",
+      isTotal: true,
+      pre_station_code: null,
+      request_count: 0,
+      approved_count: 0,
+      rejected_count: 0,
+      pending_count: 0,
+      pending_ps_count: 0,
+      pending_dcrb_count: 0,
+      pending_liu_count: 0,
+      pending_dcp_count: 0,
+      own_to_other: 0,
+      other_to_own: 0,
+    };
+
+    // Sum every numeric column
+    result.forEach((row) => {
+      totalRow.request_count += Number(row.request_count || 0);
+      totalRow.approved_count += Number(row.approved_count || 0);
+      totalRow.rejected_count += Number(row.rejected_count || 0);
+      totalRow.pending_count += Number(row.pending_count || 0);
+      totalRow.pending_ps_count += Number(row.pending_ps_count || 0);
+      totalRow.pending_dcrb_count += Number(row.pending_dcrb_count || 0);
+      totalRow.pending_liu_count += Number(row.pending_liu_count || 0);
+      totalRow.pending_dcp_count += Number(row.pending_dcp_count || 0);
+      totalRow.own_to_other += Number(row.own_to_other || 0);
+      totalRow.other_to_own += Number(row.other_to_own || 0);
+    });
+
+    // Add total row at the end
+    // result.push(totalRow);
+     // Add total row at the end
+    // usertype == 1 ? "" :  
     
-
-
-
-// Calculate total row
-const totalRow = {
-  verification_type : "TOTAL",
-  isTotal: true,
-  pre_station_code: null,
-  request_count: 0,
-  approved_count: 0,
-  rejected_count: 0,
-  pending_count: 0,
-  pending_ps_count: 0,
-  pending_dcrb_count: 0,
-  pending_liu_count: 0,
-  pending_dcp_count: 0,
-  own_to_other: 0,
-  other_to_own: 0,
-};
-
-// Sum every numeric column
-result.forEach((row) => {
-  totalRow.request_count += Number(row.request_count || 0);
-  totalRow.approved_count += Number(row.approved_count || 0);
-  totalRow.rejected_count += Number(row.rejected_count || 0);
-  totalRow.pending_count += Number(row.pending_count || 0);
-  totalRow.pending_ps_count += Number(row.pending_ps_count || 0);
-  totalRow.pending_dcrb_count += Number(row.pending_dcrb_count || 0);
-  totalRow.pending_liu_count += Number(row.pending_liu_count || 0);
-  totalRow.pending_dcp_count += Number(row.pending_dcp_count || 0);
-  totalRow.own_to_other += Number(row.own_to_other || 0);
-  totalRow.other_to_own += Number(row.other_to_own || 0);
-});
-
-// Add total row at the end
-result.push(totalRow);
-
+    result.push(totalRow);
 
     res.json({
-        DashboardResult : result
-      })
-
-  }
-   catch (err) {
+      DashboardResult: result,
+    });
+  } catch (err) {
     next(err);
   }
+};
 
-}
+const PendingDurationSummary = async (req, res, next) => {
+  console.log(" you called PendingDurationSummary .........");
 
-const PendingDurationSummary= async(req,res,next)=>{
-console.log(" you called PendingDurationSummary .........");
-   
-try{
-   const { userid } = req.user;
+  try {
+    const { userid, usertype } = req.user;
+    let query ="";
 
-const query = `
+    if(usertype ==5){
+     query = `
 SELECT
     ROW_NUMBER() OVER (ORDER BY t.ApplicationType) AS SNo,
     t.ApplicationType,
@@ -1312,52 +1344,233 @@ LEFT JOIN
     ON a.ApplicationType = t.ApplicationType
 
 ORDER BY t.ApplicationType`;
+    }else if (usertype ==1){
+      query =`SELECT
+    ROW_NUMBER() OVER (ORDER BY t.ApplicationType) AS SNo,
+    t.ApplicationType,
+    t.typeKey,
 
-const [result] = await pool.execute(query,[userid]);
+    COALESCE(a.Total, 0) AS Total,
+    COALESCE(a.Within15Days, 0) AS Within15Days,
+    COALESCE(a.Between16To30Days, 0) AS Between16To30Days,
+    COALESCE(a.Between31To90Days, 0) AS Between31To90Days,
+    COALESCE(a.Between91To180Days, 0) AS Between91To180Days,
+    COALESCE(a.Between181To365Days, 0) AS Between181To365Days,
+    COALESCE(a.Above01Year, 0) AS Above01Year
 
-// Calculate total row
-const totalRow = {
-  ApplicationType : "TOTAL",
-  isTotal: true,
-  Total: 0,
-  Within15Days: 0,
-  Between16To30Days: 0,
-  Between31To90Days: 0,
-  Between91To180Days: 0,
-  Between181To365Days: 0,
-  Above01Year: 0,
-};
+FROM
+(
+    SELECT 'Character' AS ApplicationType, 'character' AS typeKey
+    UNION ALL
+    SELECT 'Employee', 'employee'
+    UNION ALL
+    SELECT 'Tenant', 'tenant'
+    UNION ALL
+    SELECT 'Domestic', 'domestic'
+    UNION ALL
+    SELECT 'Postmortem', 'postmortem'
+    UNION ALL
+    SELECT 'Complaints', 'complaint'
+) t
 
-// Sum every numeric column
-result.forEach((row) => {
-  totalRow.Total += Number(row.Total || 0);
-  totalRow.Within15Days += Number(row.Within15Days || 0);
-  totalRow.Between16To30Days += Number(row.Between16To30Days || 0);
-  totalRow.Between31To90Days += Number(row.Between31To90Days || 0);
-  totalRow.Between91To180Days += Number(row.Between91To180Days || 0);
-  totalRow.Between181To365Days += Number(row.Between181To365Days || 0);
-  totalRow.Above01Year += Number(row.Above01Year || 0);
-});
+LEFT JOIN
+(
+    SELECT
+        applications.ApplicationType,
 
-// Add total row at the end
-result.push(totalRow);
+        COUNT(applications.request_number) AS Total,
 
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 0 AND 15
+                THEN 1 ELSE 0
+            END
+        ) AS Within15Days,
 
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 16 AND 30
+                THEN 1 ELSE 0
+            END
+        ) AS Between16To30Days,
 
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 31 AND 90
+                THEN 1 ELSE 0
+            END
+        ) AS Between31To90Days,
 
-return res.json({
-      result: result
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 91 AND 180
+                THEN 1 ELSE 0
+            END
+        ) AS Between91To180Days,
+
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date)
+                     BETWEEN 181 AND 365
+                THEN 1 ELSE 0
+            END
+        ) AS Between181To365Days,
+
+        SUM(
+            CASE
+                WHEN DATEDIFF(CURDATE(), applications.request_date) > 365
+                THEN 1 ELSE 0
+            END
+        ) AS Above01Year
+
+    FROM
+    (
+        /* Character */
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            pre_current_status,
+            'Character' AS ApplicationType
+        FROM characters
+
+        UNION ALL
+
+        /* Employee */
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            pre_current_status,
+            'Employee' AS ApplicationType
+        FROM employees
+
+        UNION ALL
+
+        /* Tenant */
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            pre_current_status,
+            'Tenant' AS ApplicationType
+        FROM tenants
+
+        UNION ALL
+
+        /* Domestic */
+        SELECT
+            request_number,
+            request_date,
+            pre_station_code,
+            pre_current_status,
+            'Domestic' AS ApplicationType
+        FROM domestic
+
+        UNION ALL
+
+        /* Postmortem */
+        SELECT
+            request_number,
+            request_date,
+            station_code AS pre_station_code,
+            pre_Current_Status AS pre_current_status,
+            'Postmortem' AS ApplicationType
+        FROM postmortem
+
+        UNION ALL
+
+        /* Complaints */
+        SELECT
+            request_number,
+            request_date,
+            station_code AS pre_station_code,
+            pre_Current_Status AS pre_current_status,
+            'Complaints' AS ApplicationType
+        FROM complaints
+
+    ) applications
+
+    /* Get station from pre_station_code */
+    INNER JOIN station_ s
+        ON s.code = applications.pre_station_code
+
+    /* Get stations assigned to this user */
+    INNER JOIN user_station us
+        ON us.station_id = s.id
+
+    WHERE
+        us.user_id = ?
+
+        AND
+        (
+            /* Character / Employee / Tenant / Domestic / Postmortem */
+            applications.ApplicationType <> 'Complaints'
+            AND applications.pre_current_status
+                NOT IN ('APPROVED', 'REJECTED')
+
+            OR
+
+            /* Complaints */
+            (
+                applications.ApplicationType = 'Complaints'
+                AND applications.pre_current_status
+                    NOT IN ('FINISHED')
+            )
+        )
+
+    GROUP BY
+        applications.ApplicationType
+
+) a
+    ON a.ApplicationType = t.ApplicationType
+
+ORDER BY
+    t.ApplicationType;`
+    }
+    const [result] = await pool.execute(query, [userid]);
+
+    // Calculate total row
+    const totalRow = {
+      ApplicationType: "TOTAL",
+      isTotal: true,
+      Total: 0,
+      Within15Days: 0,
+      Between16To30Days: 0,
+      Between31To90Days: 0,
+      Between91To180Days: 0,
+      Between181To365Days: 0,
+      Above01Year: 0,
+    };
+
+    // Sum every numeric column
+    result.forEach((row) => {
+      totalRow.Total += Number(row.Total || 0);
+      totalRow.Within15Days += Number(row.Within15Days || 0);
+      totalRow.Between16To30Days += Number(row.Between16To30Days || 0);
+      totalRow.Between31To90Days += Number(row.Between31To90Days || 0);
+      totalRow.Between91To180Days += Number(row.Between91To180Days || 0);
+      totalRow.Between181To365Days += Number(row.Between181To365Days || 0);
+      totalRow.Above01Year += Number(row.Above01Year || 0);
     });
 
+    // Add total row at the end
+    // usertype == 1 ? "" :  
+    result.push(totalRow);
+
+    return res.json({
+      result: result,
+    });
   } catch (err) {
-    console.error(
-      'Dashboard Error:',
-      err
-    );
+    console.error("Dashboard Error:", err);
 
     next(err);
   }
-}
+};
 
 // login ps name and  ps code
 let login = async (req, res) => {
@@ -1400,7 +1613,8 @@ let login = async (req, res) => {
     }
     // console.log(req.session?.user);
 
-    const jwtSecret = process.env.JWT_SECRET || "super_secret_cctns_agra_jwt_key_2026_verif";
+    const jwtSecret =
+      process.env.JWT_SECRET || "super_secret_cctns_agra_jwt_key_2026_verif";
 
     let token = jwt.sign(
       {
@@ -1450,7 +1664,8 @@ const loginsession = async (req, res) => {
   let connection;
   try {
     const trimmedToken = token.trim();
-    const jwtSecret = process.env.JWT_SECRET || "super_secret_cctns_agra_jwt_key_2026_verif";
+    const jwtSecret =
+      process.env.JWT_SECRET || "super_secret_cctns_agra_jwt_key_2026_verif";
 
     // Verify token synchronously; throws on invalid token
     const decoded = jwt.verify(trimmedToken, jwtSecret);
@@ -1492,12 +1707,14 @@ const loginsession = async (req, res) => {
 const uploadFile = async (req, res, next) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
+      return res.status(400).json({ error: "No file uploaded" });
     }
 
     const fileExt = req.file.originalname
-      ? req.file.originalname.substring(req.file.originalname.lastIndexOf('.')).toUpperCase()
-      : '';
+      ? req.file.originalname
+          .substring(req.file.originalname.lastIndexOf("."))
+          .toUpperCase()
+      : "";
 
     const parsedResult = await processExcelBuffer(req.file.buffer);
 
@@ -1518,11 +1735,10 @@ const uploadFile = async (req, res, next) => {
   }
 };
 
-const updateStatus = async(req,res,next)=>{
-      const { type, request_number } = req.query.type;
-console.log(" type ", type , "updateStatusrequest_number ", request_number);
-try {
-
+const updateStatus = async (req, res, next) => {
+  const { type, request_number } = req.query.type;
+  console.log(" type ", type, "updateStatusrequest_number ", request_number);
+  try {
     if (!request_number) {
       return res.status(400).json({
         success: false,
@@ -1536,16 +1752,14 @@ try {
       success: true,
       message: "Update completed successfully",
       type: type,
-      request_number: request_number
+      request_number: request_number,
     });
   } catch (error) {
     next(error);
   }
-}
-
+};
 
 module.exports = {
-
   Dashboard,
   PendingDurationSummary,
   combinedDashbaord,
@@ -1558,5 +1772,5 @@ module.exports = {
   login,
   loginsession,
   complaintList,
-  updateStatus
+  updateStatus,
 };
