@@ -223,7 +223,8 @@ export default function Navbar() {
             </ul>
           </li>
 
-          {/* Upload files for view admin only   */}
+          {/* Upload files for view admin only (usertype 5) */}
+          {user?.usertype === 5 && (
           <li className={isUploadActive ? 'active-menu' : ''}>
             <Link to="/upload" className="menu-title">📤 Uploads</Link>
             <ul>
@@ -232,6 +233,7 @@ export default function Navbar() {
               </li>
             </ul>
           </li>
+          )}
         </ul>
       </nav>
     </div>

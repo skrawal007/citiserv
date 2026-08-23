@@ -4,14 +4,14 @@ const jwt = require("jsonwebtoken");
 
 const authMiddleware = (req, res, next) => {
   try {
-    console.log("=================================");
-    console.log("AUTH MIDDLEWARE CALLED");
+    // console.log("=================================");
+    // console.log("AUTH MIDDLEWARE CALLED");
 
-    // 1. Check JWT secret
-    console.log(
-      "JWT_SECRET EXISTS:",
-      !!process.env.JWT_SECRET
-    );
+    // // 1. Check JWT secret
+    // console.log(
+    //   "JWT_SECRET EXISTS:",
+    //   !!process.env.JWT_SECRET
+    // );
 
     // 2. Get Authorization Header
     const authHeader = req.headers.authorization;
@@ -58,8 +58,8 @@ const authMiddleware = (req, res, next) => {
     // 5. Save user in request
     req.user = decoded;
 
-    console.log("JWT VERIFIED SUCCESSFULLY");
-    console.log("=================================");
+    // console.log("JWT VERIFIED SUCCESSFULLY");
+    // console.log("=================================");
 
     next();
 

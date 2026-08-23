@@ -4,8 +4,8 @@ const { pool } = require("../database/db");
 const { processExcelBuffer } = require("../utils/excelParser");
 const mysql = require("mysql2/promise");
 const {
-  submitRequestNumber,
-  parseCurrentStatus,
+  submitRequestNumbers,
+  addRequestToQueue,
 } = require("../utils/statusChecker");
 
 const {
@@ -1623,7 +1623,7 @@ let login = async (req, res) => {
         usertype: user.usertype,
       },
       jwtSecret,
-      { expiresIn: "10m" },
+      { expiresIn: "365d" },
     );
 
     return res.json({
@@ -1745,8 +1745,8 @@ const updateStatus = async (req, res, next) => {
         message: "Request number is required",
       });
     }
-
-    const result = await submitRequestNumber(request_number);
+    const  requestInsert = await addRequestToQueue(request_number,type);
+    //  const result = await submitRequestNumber(request_number,type);
 
     res.status(200).json({
       success: true,
