@@ -7,6 +7,7 @@ const {
   submitRequestNumbers,
   addRequestToQueue,
 } = require("../utils/statusChecker");
+const sse = require("../utils/sseBroadcast");
 
 const {
   PS_STATUSES,
@@ -183,7 +184,7 @@ const employeeList = async (req, res, next) => {
 
     query += ` ORDER BY pre_station_name, request_date;`;
 
-    console.log(mysql.format(query, params));
+    // console.log(mysql.format(query, params));
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
@@ -1736,8 +1737,8 @@ const uploadFile = async (req, res, next) => {
 };
 
 const updateStatus = async (req, res, next) => {
-  const { type, request_number } = req.query.type;
-  console.log(" type ", type, "updateStatusrequest_number ", request_number);
+  const { type, request_number } = req.query;
+  console.log(" type ", type, "updateStatus request_number ", request_number);
   try {
     if (!request_number) {
       return res.status(400).json({
@@ -1745,15 +1746,82 @@ const updateStatus = async (req, res, next) => {
         message: "Request number is required",
       });
     }
-    const  requestInsert = await addRequestToQueue(request_number,type);
-    //  const result = await submitRequestNumber(request_number,type);
+    if (!type) {
+      return res.status(400).json({
+        success: false,
+        message: "Type is required",
+      });
+    }
+
+    const requestInsert = await addRequestToQueue(request_number, type);
+
+    // ── Real-time broadcast to ALL connected SSE clients ──────────────────
+    // Every browser tab / user will immediately see this request as PENDING.
+    sse.broadcast('queue:added', {
+      request_number: String(request_number),
+      type,
+      status: 'PENDING',
+    });
+    // ─────────────────────────────────────────────────────────────────────
 
     res.status(200).json({
-      success: true,
-      message: "Update completed successfully",
-      type: type,
-      request_number: request_number,
+      success: requestInsert.success,
+      message: requestInsert.message,
+      type,
+      request_number,
+      queued: requestInsert.inserted,
+      alreadyQueued: !requestInsert.inserted,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ── SSE stream endpoint ───────────────────────────────────────────────────────
+// Browsers connect here with EventSource. We keep the connection open and push
+// named events whenever queue state changes.
+const queueStream = (req, res) => {
+  // SSE mandatory headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // disable nginx buffering
+  res.flushHeaders();
+
+  // Initial comment — confirms connection to the browser
+  res.write(': connected\n\n');
+
+  // Register this client so broadcast() can reach it
+  sse.addClient(res);
+
+  // Heartbeat every 25 s — prevents proxy/load-balancer timeouts
+  const heartbeat = setInterval(() => {
+    try {
+      res.write(': ping\n\n');
+    } catch (_err) {
+      clearInterval(heartbeat);
+    }
+  }, 25000);
+
+  // Cleanup when the browser closes the tab / loses connection
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    sse.removeClient(res);
+  });
+};
+
+// ── Queue status snapshot ─────────────────────────────────────────────────────
+// Returns every PENDING / PROCESSING row so the frontend can initialise
+// button states without waiting for a broadcast event.
+const queueStatus = async (req, res, next) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT request_no, request_type, status
+       FROM ver_request_queue
+       WHERE status IN ('PENDING', 'PROCESSING')
+       ORDER BY created_at ASC`
+    );
+    res.status(200).json(rows);
   } catch (error) {
     next(error);
   }
@@ -1773,4 +1841,6 @@ module.exports = {
   loginsession,
   complaintList,
   updateStatus,
+  queueStream,
+  queueStatus,
 };

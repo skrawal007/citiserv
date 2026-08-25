@@ -1,5 +1,15 @@
 const puppeteer = require("puppeteer");
 const { pool } = require("../database/db");
+const sse = require("./sseBroadcast");
+const mysql = require("mysql2/promise");
+
+const { ver_status, STATUS_MAP } = require("../database/status_map");
+
+let queueTimer = null;
+let processing = false;
+
+const MAX_REQUESTS = 100;
+const WAIT_TIME = 10 * 1000;
 
 const submitRequestNumbers = async (requests) => {
   let browser;
@@ -16,7 +26,7 @@ const submitRequestNumbers = async (requests) => {
       executablePath:
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 
-      headless: false,
+      headless: true,
       defaultViewport: null,
       ignoreHTTPSErrors: true,
 
@@ -61,7 +71,6 @@ const submitRequestNumbers = async (requests) => {
       domestic: "DOMESTICVERIFICATION",
       employee: "EMPLOYEEVERIFICATION",
       tenant: "TENNANTVERIFICATION",
-
       event: "EVENTPERFORMANCE",
       procession: "PROCESSION",
       protest: "PROTESTSTRIKE",
@@ -243,10 +252,18 @@ const submitRequestNumbers = async (requests) => {
         // CONVERT TABLE ROW TO JSON
         // ======================================================
 
+        const { pre_Current_Status, per_Current_Status } = parseCurrentStatus(
+          cells[1],
+        );
+
         const data = {
           registrationNumber: cells[0] || "",
 
-          currentStatus: cells[1] || "",
+          currentStatus: cells[1].replace(/\s+/g, "") || "",
+
+          pre_Current_Status: pre_Current_Status,
+
+          per_Current_Status: per_Current_Status,
 
           district: cells[2] || "",
 
@@ -270,25 +287,6 @@ const submitRequestNumbers = async (requests) => {
         }
 
         // ======================================================
-        // PARSE STATUS
-        // ======================================================
-
-        // const parsedStatus =
-        //   parseCurrentStatus(
-        //     data.currentStatus,
-        //     data.registrationNumber
-        //   );
-
-        console.log(`SUCCESS ${requestNo}`);
-
-        console.log("Data:", data);
-
-        // console.log(
-        //   "Parsed status:",
-        //   parsedStatus
-        // );
-
-        // ======================================================
         // ADD SUCCESS RESULT
         // ======================================================
 
@@ -302,8 +300,6 @@ const submitRequestNumbers = async (requests) => {
           success: true,
 
           data,
-
-          // parsedStatus,
         });
       } catch (error) {
         // ======================================================
@@ -411,30 +407,42 @@ module.exports = {
   addRequestToQueue,
 };
 
-function parseCurrentStatus(current_status, requestNo) {
+function parseCurrentStatus(current_status) {
   const status = current_status.replace(/\s+/g, "");
 
-  console.log("requestNo ", requestNo, " parse status ", status);
+  console.log(" status ", status);
+
+  // ==========================================
+  // STATUS
+  // ==========================================
+
+  let pre_Current_Status = null;
+  let per_Current_Status = null;
+
+  if (!status.includes("स्थायीपता")) {
+    pre_Current_Status = getStatusCode(status);
+  } else {
+    const { presentAddress, permanentAddress } = getSepareteStatus(status);
+
+    pre_Current_Status = getStatusCode(presentAddress);
+
+    per_Current_Status = getStatusCode(permanentAddress);
+  }
+
+  console.log(
+    " pre_Current_Status ",
+    pre_Current_Status,
+    " per_Current_Status ",
+    per_Current_Status,
+  );
 
   // --------------------------------
   // ALREADY APPROVED
   // --------------------------------
   if (status === "स्वीकृत") {
     return {
-      requestNo: requestNo,
-
-      hasPermanentAddress: false,
-
-      pre_policeStationStatus: "",
-      pre_dcrbStatus: "",
-      pre_liuStatus: "",
-
-      per_policeStationStatus: "",
-      per_dcrbStatus: "",
-      per_liuStatus: "",
-
-      pre_permanentStatus: null,
-      pre_dcpStatus: "स्वीकृत",
+      pre_Current_Status: ver_status["स्वीकृत"],
+      per_Current_Status: "",
     };
   }
 
@@ -443,118 +451,19 @@ function parseCurrentStatus(current_status, requestNo) {
   // --------------------------------
   if (status.includes("अस्वीकृत-")) {
     return {
-      requestNo: requestNo,
-
-      hasPermanentAddress: false,
-
-      pre_policeStationStatus: "",
-      pre_dcrbStatus: "",
-      pre_liuStatus: "",
-
-      per_policeStationStatus: "",
-      per_dcrbStatus: "",
-      per_liuStatus: "",
-
-      pre_permanentStatus: null,
-      pre_dcpStatus: "अस्वीकृत",
+      pre_Current_Status: ver_status["अस्वीकृत"],
+      per_Current_Status: "",
     };
-  }
-
-  // --------------------------------
-  // CHECK PERMANENT ADDRESS
-  // --------------------------------
-  const hasPermanentAddress = status.includes("स्थायीपता:-");
-
-  // --------------------------------
-  // DCP STATUS
-  // --------------------------------
-  const lastDashIndex = status.lastIndexOf("-");
-
-  const pre_dcpStatus =
-    lastDashIndex !== -1 ? status.substring(lastDashIndex + 1) : "";
-
-  // --------------------------------
-  // CURRENT ADDRESS STATUS
-  // --------------------------------
-  const currentMatch = status.match(/वर्तमानपता:-\((.*?)\)/);
-
-  let pre_policeStationStatus = "";
-  let pre_dcrbStatus = "";
-  let pre_liuStatus = "";
-
-  if (currentMatch) {
-    const currentParts = currentMatch[1].split("/");
-
-    pre_policeStationStatus = currentParts[0] || "";
-    pre_dcrbStatus = currentParts[1] || "";
-    pre_liuStatus = currentParts[2] || "";
-  }
-
-  // --------------------------------
-  // PERMANENT ADDRESS STATUS
-  // --------------------------------
-  let pre_permanentStatus = null;
-
-  let per_policeStationStatus = "";
-  let per_dcrbStatus = "";
-  let per_liuStatus = "";
-
-  if (hasPermanentAddress) {
-    const permanentMatch = status.match(/स्थायीपता:-\((.*?)\)/);
-
-    if (permanentMatch) {
-      pre_permanentStatus = permanentMatch[1];
-
-      // Split permanent status by /
-      const permanentParts = pre_permanentStatus.split("/");
-
-      per_policeStationStatus = permanentParts[0] || "";
-
-      per_dcrbStatus = permanentParts[1] || "";
-
-      per_liuStatus = permanentParts[2] || "";
-
-      // console.log("स्थायीपता:", pre_permanentStatus);
-
-      // console.log("Permanent Police Station:", per_policeStationStatus);
-
-      // console.log("Permanent DCRB:", per_dcrbStatus);
-
-      // console.log("Permanent LIU:", per_liuStatus);
-    }
   }
 
   // --------------------------------
   // RETURN
   // --------------------------------
   return {
-    requestNo: requestNo,
-
-    hasPermanentAddress,
-
-    // वर्तमान पता
-    pre_policeStationStatus,
-    pre_dcrbStatus,
-    pre_liuStatus,
-
-    // स्थायी पता
-    per_policeStationStatus,
-    per_dcrbStatus,
-    per_liuStatus,
-
-    // Complete permanent status
-    pre_permanentStatus,
-
-    // DCP
-    pre_dcpStatus,
+    pre_Current_Status: pre_Current_Status,
+    per_Current_Status: per_Current_Status,
   };
 }
-
-let queueTimer = null;
-let processing = false;
-
-const MAX_REQUESTS = 100;
-const WAIT_TIME = 50 * 1000;
 
 async function wakeQueueWorker() {
   console.log(" you have called inside wakeQueueWorker  ");
@@ -676,9 +585,9 @@ async function processRequestBatch() {
         created_at
       FROM ver_request_queue
       WHERE status = 'PENDING'
-      ORDER BY request_type,created_at ASC
+      ORDER BY request_type, created_at ASC
       LIMIT ?
-    `,
+      `,
       [MAX_REQUESTS],
     );
 
@@ -697,32 +606,32 @@ async function processRequestBatch() {
     // Mark selected records as PROCESSING
     // --------------------------------------------------
 
-    // await pool.query(
-    //   `
-    //   UPDATE ver_request_queue
-    //   SET
-    //     status = 'PROCESSING',
-    //     processing_started_at = NOW(),
-    //     error_message = NULL
-    //   WHERE id IN (?)
-    //   `,
-    //   [ids],
-    // );
+    await pool.query(
+      `
+      UPDATE ver_request_queue
+      SET
+        status = 'PROCESSING',
+        processing_started_at = NOW(),
+        error_message = NULL
+      WHERE id IN (${ids.map(() => "?").join(",")})
+      `,
+      ids,
+    );
 
     // --------------------------------------------------
-    // Create array for Puppeteer
-    //
-    // Example:
-    // [
-    //   {
-    //      request_no: "ABC123",
-    //      request_type: "character"
-    //   },
-    //   {
-    //      request_no: "ABC456",
-    //      request_type: "tenant"
-    //   }
-    // ]
+    // Notify clients
+    // --------------------------------------------------
+
+    for (const row of requests) {
+      sse.broadcast("queue:processing", {
+        request_number: String(row.request_no),
+        type: row.request_type,
+        status: "PROCESSING",
+      });
+    }
+
+    // --------------------------------------------------
+    // Create Puppeteer batch
     // --------------------------------------------------
 
     const submitRequests = requests.map((row) => ({
@@ -734,7 +643,6 @@ async function processRequestBatch() {
 
     // --------------------------------------------------
     // PROCESS ENTIRE BATCH
-    // Chrome opens once inside submitRequestNumbers()
     // --------------------------------------------------
 
     const batchResult = await submitRequestNumbers(submitRequests);
@@ -744,91 +652,276 @@ async function processRequestBatch() {
       total: batchResult.total,
       processed: batchResult.processed,
     });
+
     console.log("results ", batchResult.results);
 
-    // --------------------------------------------------
+    // ==================================================
     // Create result lookup
-    // requestNo + type is safer than requestNo alone
-    // --------------------------------------------------
+    // ==================================================
 
     const resultMap = new Map();
 
     for (const result of batchResult.results || []) {
-      const key = `${result.requestNo}::${String(result.type || "")
+      const key = `${String(result.requestNo || "").trim()}::${String(
+        result.type || "",
+      )
         .trim()
         .toLowerCase()}`;
 
       resultMap.set(key, result);
     }
 
-    // --------------------------------------------------
-    // Update each database request according to result
-    // --------------------------------------------------
+    // ==================================================
+    // BULK UPDATE ver_request_queue
+    //
+    // Updates:
+    //   status
+    //   active_status
+    //   completed_at
+    //   error_message
+    //
+    // One SQL query for the whole batch
+    // ==================================================
+
+    // ==================================================
+    // BULK UPDATE ver_request_queue
+    // ==================================================
+    const statusCase = [];
+    const statusValueCase = [];
+    const preStatusCase = [];
+    const perStatusCase = [];
+    const errorCase = [];
+
+    const statusParams = [];
+    const statusValueParams = [];
+    const preStatusParams = [];
+    const perStatusParams = [];
+    const errorParams = [];
+    const whereParts = []; 
+    const whereParams = [];
 
     for (const request of requests) {
-      const key = `${request.request_no}::${String(request.request_type || "")
+      const key = `${String(request.request_no).trim()}::${String(
+        request.request_type || "",
+      )
+        .trim()
+        .toLowerCase()}`;
+
+      const result = resultMap.get(key);
+
+      // --------------------------------------------------
+      // No result returned
+      // --------------------------------------------------
+
+      if (!result) {
+        const errorMessage = "No result returned from submitRequestNumbers";
+
+        statusCase.push(`WHEN id = ? THEN 'FAILED'`);
+        statusParams.push(request.id);
+
+        statusValueCase.push(`WHEN id = ? THEN ?`);
+        statusValueParams.push(request.id, null);
+
+        preStatusCase.push(`WHEN id = ? THEN ?`);
+        preStatusParams.push(request.id, null);
+
+        perStatusCase.push(`WHEN id = ? THEN ?`);
+        perStatusParams.push(request.id, null);
+
+        errorCase.push(`WHEN id = ? THEN ?`);
+        errorParams.push(request.id, errorMessage);
+
+        whereParts.push(`id = ?`);
+        whereParams.push(request.id);
+
+        continue;
+      }
+
+      // --------------------------------------------------
+      // SUCCESS
+      // --------------------------------------------------
+      if (result.success) {
+        const active_status = result.data?.currentStatus || null;
+
+        const active_pre_status = result.data?.pre_Current_Status || null;
+
+        const active_per_status = result.data?.per_Current_Status || null;
+
+        // status
+        statusCase.push(`WHEN id = ? THEN 'COMPLETED'`);
+        statusParams.push(request.id);
+
+        // current Hindi status
+        statusValueCase.push(`WHEN id = ? THEN ?`);
+        statusValueParams.push(request.id, active_status);
+
+        // present address status
+        preStatusCase.push(`WHEN id = ? THEN ?`);
+        preStatusParams.push(request.id, active_pre_status);
+
+        // permanent address status
+        perStatusCase.push(`WHEN id = ? THEN ?`);
+        perStatusParams.push(request.id, active_per_status);
+
+        // error
+        errorCase.push(`WHEN id = ? THEN NULL`);
+        errorParams.push(request.id);
+
+        whereParts.push(`id = ?`);
+        whereParams.push(request.id);
+
+        continue;
+      }
+
+      // --------------------------------------------------
+      // FAILED
+      // --------------------------------------------------
+      const errorMessage = result.message || "Request processing failed";
+
+      const active_status = result.data?.currentStatus || null;
+
+      const active_pre_status = result.data?.pre_Current_Status || null;
+
+      const active_per_status = result.data?.per_Current_Status || null;
+
+      statusCase.push(`WHEN id = ? THEN 'FAILED'`);
+      statusParams.push(request.id);
+
+      statusValueCase.push(`WHEN id = ? THEN ?`);
+      statusValueParams.push(request.id, active_status);
+
+      preStatusCase.push(`WHEN id = ? THEN ?`);
+      preStatusParams.push(request.id, active_pre_status);
+
+      perStatusCase.push(`WHEN id = ? THEN ?`);
+      perStatusParams.push(request.id, active_per_status);
+
+      errorCase.push(`WHEN id = ? THEN ?`);
+      errorParams.push(request.id, errorMessage);
+
+      whereParts.push(`id = ?`);
+      whereParams.push(request.id);
+    }
+
+    // ==================================================
+    // EXECUTE ONE BULK UPDATE
+    // ==================================================
+
+if (whereParts.length > 0) {
+  const sql = `
+    UPDATE ver_request_queue
+    SET
+
+      status = CASE
+        ${statusCase.join("\n")}
+        ELSE status
+      END,
+
+      active_status = CASE
+        ${statusValueCase.join("\n")}
+        ELSE active_status
+      END,
+
+      active_pre_status = CASE
+        ${preStatusCase.join("\n")}
+        ELSE active_pre_status
+      END,
+
+      active_per_status = CASE
+        ${perStatusCase.join("\n")}
+        ELSE active_per_status
+      END,
+
+      completed_at = NOW(),
+
+      error_message = CASE
+        ${errorCase.join("\n")}
+        ELSE error_message
+      END
+
+    WHERE ${whereParts.join(" OR ")}
+  `;
+
+  const params = [
+    ...statusParams,
+
+    ...statusValueParams,
+
+    ...preStatusParams,
+
+    ...perStatusParams,
+
+    ...errorParams,
+
+    ...whereParams,
+  ];
+
+  console.log("QUEUE UPDATE SQL:");
+  console.log(mysql.format(sql, params));
+
+  await pool.query(sql, params);
+
+  console.log(
+    `Bulk updated ${requests.length} queue records`
+  );
+}
+
+    // ==================================================
+    // SSE NOTIFICATIONS
+    // ==================================================
+
+    for (const request of requests) {
+      const key = `${String(request.request_no).trim()}::${String(
+        request.request_type || "",
+      )
         .trim()
         .toLowerCase()}`;
 
       const result = resultMap.get(key);
 
       // -----------------------------------------------
-      // No result returned from Puppeteer
+      // No result
       // -----------------------------------------------
 
-      // if (!result) {
-      //   await pool.query(
-      //     `
-      //     UPDATE ver_request_queue
-      //     SET
-      //       status = 'FAILED',
-      //       completed_at = NOW(),
-      //       error_message = ?
-      //     WHERE id = ?
-      //     `,
-      //     ["No result returned from submitRequestNumbers", request.id],
-      //   );
+      if (!result) {
+        sse.broadcast("queue:failed", {
+          request_number: String(request.request_no),
+          type: request.request_type,
+          status: "FAILED",
+          message: "No result returned from submitRequestNumbers",
+        });
 
-      //   continue;
-      // }
+        continue;
+      }
 
       // -----------------------------------------------
-      // Successfully processed
+      // Success
       // -----------------------------------------------
 
-      // if (result.success) {
-      //   await pool.query(
-      //     `
-      //     UPDATE ver_request_queue
-      //     SET
-      //       status = 'COMPLETED',
-      //       completed_at = NOW(),
-      //       error_message = NULL
-      //     WHERE id = ?
-      //     `,
-      //     [request.id],
-      //   );
+      if (result.success) {
+        sse.broadcast("queue:completed", {
+          request_number: String(request.request_no),
+          type: result.type,
+          status: "COMPLETED",
+          active_status: result.data?.currentStatus || null,
+        });
 
-      //   console.log(`COMPLETED: ${request.request_no}`);
+        // console.log(`COMPLETED: ${request.request_no} | active_status: ${result.data?.currentStatus || "N/A"}`,);
 
-      //   continue;
-      // }
+        continue;
+      }
 
       // -----------------------------------------------
-      // Failed request
+      // Failed
       // -----------------------------------------------
 
-      // await pool.query(
-      //   `
-      //   UPDATE ver_request_queue
-      //   SET
-      //     status = 'FAILED',
-      //     completed_at = NOW(),
-      //     error_message = ?
-      //   WHERE id = ?
-      //   `,
-      //   [result.message || "Request processing failed", request.id],
-      // );
+      sse.broadcast("queue:failed", {
+        request_number: String(request.request_no),
+        type: request.request_type,
+        status: "FAILED",
+        message: result.message,
+        active_status: result.data?.currentStatus || null,
+      });
 
       console.log(
         `FAILED: ${request.request_no} - ${result.message || "Unknown error"}`,
@@ -840,26 +933,73 @@ async function processRequestBatch() {
     console.error("processRequestBatch error:", error);
 
     // --------------------------------------------------
-    // If complete batch-level error occurred,
-    // mark still PROCESSING records as FAILED
+    // Batch-level error
     // --------------------------------------------------
 
     if (requests.length > 0) {
       const ids = requests.map((row) => row.id);
 
       try {
-        // await pool.query(
-        //   `
-        //   UPDATE ver_request_queue
-        //   SET
-        //     status = 'FAILED',
-        //     completed_at = NOW(),
-        //     error_message = ?
-        //   WHERE id IN (?)
-        //   AND status = 'PROCESSING'
-        //   `,
-        //   [error.message || "Batch processing failed", ids],
-        // );
+        const sql = `
+  UPDATE ver_request_queue
+  SET
+    status = CASE
+      ${statusCase.join("\n")}
+    END,
+
+    active_status = CASE
+      ${statusValueCase.join("\n")}
+      ELSE active_status
+    END,
+
+    active_pre_status = CASE
+      ${preStatusCase.join("\n")}
+      ELSE active_pre_status
+    END,
+
+    active_per_status = CASE
+      ${perStatusCase.join("\n")}
+      ELSE active_per_status
+    END,
+
+    completed_at = NOW(),
+
+    error_message = CASE
+      ${errorCase.join("\n")}
+    END
+
+  WHERE ${whereParts.join(" OR ")}
+`;
+
+        const params = [
+          ...statusParams,
+
+          ...statusValueParams,
+
+          ...preStatusParams,
+
+          ...perStatusParams,
+
+          ...errorParams,
+
+          ...whereParams,
+        ];
+
+        await pool.query(sql, params);
+       console.log(mysql.format(sql, params));
+        
+        // --------------------------------------------------
+        // Notify clients
+        // --------------------------------------------------
+
+        for (const req of requests) {
+          sse.broadcast("queue:failed", {
+            request_number: String(req.request_no),
+            type: req.request_type,
+            status: "FAILED",
+            message: error.message,
+          });
+        }
       } catch (updateError) {
         console.error("Failed to update batch status:", updateError);
       }
@@ -867,4 +1007,48 @@ async function processRequestBatch() {
   } finally {
     processing = false;
   }
+}
+
+function getStatusCode(statusText) {
+  let cleanedStatus = statusText.replace(/\s+/g, "").trim();
+  if (
+    statusText.includes("वर्तमानपता:-") ||
+    statusText.includes("स्थायीपता:-")
+  ) {
+    cleanedStatus = statusText
+      .replace(/वर्तमानपता\s*:-/g, "")
+      .replace(/स्थायीपता\s*:-/g, "")
+      .trim();
+  }
+  if (!cleanedStatus) {
+    return "";
+  }
+  return STATUS_MAP[cleanedStatus] || "ok";
+}
+
+function getSepareteStatus(text) {
+  const parts = text.split("-");
+  // console.log("parts length  ", parts.length);
+  // console.log("part[1]", parts[1]);
+  // console.log("part[2]", parts[2]);
+  // console.log("part[3]", parts[3]);
+  // console.log("part[4]", parts[4]);
+  // console.log("part[5]", parts[5]);
+  if (parts.length < 4) {
+    return {
+      presentAddress: "",
+      permanentAddress: "",
+    };
+  }
+
+  const presentAddress = `${parts[1]}-${parts[4]}`;
+
+  const permanentAddress = `${parts[3]}`;
+
+  // console.log(" premanentAddress : ", presentAddress);
+  // console.log(" permanentAddress : ", permanentAddress)
+  return {
+    presentAddress,
+    permanentAddress,
+  };
 }

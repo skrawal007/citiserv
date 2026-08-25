@@ -974,61 +974,118 @@ td a:hover {
 /* ......................................................................... */
 
 
+/* ── Update Button — multi-phase colour system ─────────────── */
+
+/* Base styles shared by all states */
 .update-btn {
   position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 6px;
 
   min-width: 118px;
-  height: 48px;
+  height: 36px;
+  padding: 0 14px;
 
   border: none;
-  border-radius: 25px;
-
-  background: #ff5a00;
-  color: white;
+  border-radius: 20px;
 
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  color: #fff;
 
   cursor: pointer;
+  outline: none;
 
-  box-shadow: 0 8px 20px rgba(255, 90, 0, 0.25);
-
-  transition: all 0.2s ease;
+  transition: background 0.25s ease, box-shadow 0.25s ease,
+              transform 0.15s ease, opacity 0.2s ease;
 }
 
-.update-btn:hover:not(:disabled) {
-  background: #f45100;
-  box-shadow: 0 10px 25px rgba(255, 90, 0, 0.35);
+.update-btn__icon {
+  font-size: 14px;
+  line-height: 1;
 }
 
-.update-btn:disabled {
+/* ── IDLE — orange ────────────────────────────────────────── */
+.update-btn--idle {
+  background: linear-gradient(135deg, #ff6b00 0%, #ff8c00 100%);
+  box-shadow: 0 4px 14px rgba(255, 107, 0, 0.35);
+}
+.update-btn--idle:hover {
+  background: linear-gradient(135deg, #e05c00 0%, #f07800 100%);
+  box-shadow: 0 6px 18px rgba(255, 107, 0, 0.45);
+  transform: translateY(-1px);
+}
+.update-btn--idle:active {
+  transform: translateY(0);
+}
+
+/* ── UPDATING — blue pulse ────────────────────────────────── */
+.update-btn--updating {
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35);
   cursor: not-allowed;
-  opacity: 0.95;
+  animation: btn-pulse 1.4s ease-in-out infinite;
 }
 
-/* Rotating circle */
+@keyframes btn-pulse {
+  0%, 100% { box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); }
+  50%       { box-shadow: 0 4px 22px rgba(37, 99, 235, 0.65); }
+}
+
+/* ── SUCCESS — green pop ──────────────────────────────────── */
+.update-btn--success {
+  background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.40);
+  animation: btn-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes btn-pop {
+  0%   { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+/* ── QUEUED — amber ───────────────────────────────────────── */
+.update-btn--queued {
+  background: linear-gradient(135deg, #b45309 0%, #d97706 100%);
+  box-shadow: 0 4px 14px rgba(180, 83, 9, 0.35);
+  animation: btn-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+/* ── ERROR — red shake ────────────────────────────────────── */
+.update-btn--error {
+  background: linear-gradient(135deg, #dc2626 0%, #ef4444 100%);
+  box-shadow: 0 4px 14px rgba(220, 38, 38, 0.40);
+  animation: btn-shake 0.4s ease forwards;
+}
+.update-btn--error:hover {
+  background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%);
+  transform: translateY(-1px);
+  cursor: pointer; /* allow retry */
+}
+
+@keyframes btn-shake {
+  0%, 100% { transform: translateX(0); }
+  20%       { transform: translateX(-4px); }
+  40%       { transform: translateX(4px); }
+  60%       { transform: translateX(-3px); }
+  80%       { transform: translateX(3px); }
+}
+
+/* ── Spinner (rotating ring) ──────────────────────────────── */
 .spinner {
-  width: 18px;
-  height: 18px;
-
-  border: 2px solid rgba(255, 255, 255, 0.4);
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
   border-top-color: #ffffff;
-
   border-radius: 50%;
-
   animation: update-spin 0.7s linear infinite;
 }
 
 @keyframes update-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.calendar-icon {
-  font-size: 18px;
+  to { transform: rotate(360deg); }
 }

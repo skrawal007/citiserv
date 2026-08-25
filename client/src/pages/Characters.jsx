@@ -5,7 +5,8 @@ import Navbar from '../components/Navbar';
 import {formatDate} from '../utils/dataConvertor';
 import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
-import UpdateButton from "../components/UpdateButton"
+import UpdateButton from "../components/UpdateButton";
+import useQueueStatus from "../hooks/useQueueStatus";
 
 const MODULE_NAMES = {
   character: 'चरित्र प्रमाण पत्र',
@@ -85,6 +86,35 @@ export default function Characters({
   const [error, setError] = useState('');
   const [policeStations, setPoliceStations] = useState([]);
   const tableRef = useRef(null);
+
+  // ── Real-time queue status (shared across ALL browser tabs / users) ─────────
+  // queueStatuses = { [request_number]: 'PENDING' | 'PROCESSING' }
+  // Updated live via SSE whenever any user clicks Update or the worker runs.
+  const { queueStatuses } = useQueueStatus();
+  // ────────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Optional callback from UpdateButton after the HTTP POST completes.
+   * Merges any fresh status fields returned by the server into the specific row
+   * — no full-table reload needed.
+   */
+  const handleRowStatusUpdate = (request_number, apiResponse) => {
+    setRows((prevRows) =>
+      prevRows.map((row) => {
+        const rowReqNum = row['अनुरोध_संख्या'] || row.request_number;
+        if (String(rowReqNum) !== String(request_number)) return row;
+        return {
+          ...row,
+          ...(apiResponse.pre_Current_Status !== undefined
+            ? { pre_Current_Status: apiResponse.pre_Current_Status }
+            : {}),
+          ...(apiResponse.per_Current_Status !== undefined
+            ? { per_Current_Status: apiResponse.per_Current_Status }
+            : {}),
+        };
+      })
+    );
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -194,7 +224,14 @@ export default function Characters({
 
                 {!hidePraAddCol && <td>{ r.permanent_address}</td>}
                 {!hideStatusCol && <td>{ r.per_Current_Status}</td>}
-                <td> <UpdateButton type={type} request_number={r.request_number}/></td>
+                <td>
+                  <UpdateButton
+                    type={type}
+                    request_number={r['अनुरोध_संख्या'] || r.request_number}
+                    queueStatus={queueStatuses[String(r['अनुरोध_संख्या'] || r.request_number)]}
+                    onStatusUpdate={handleRowStatusUpdate}
+                  />
+                </td>
               </tr>
             ))}
           </tbody>
