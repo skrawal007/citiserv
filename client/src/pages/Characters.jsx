@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
@@ -7,6 +7,8 @@ import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
 import UpdateButton from "../components/UpdateButton";
 import useQueueStatus from "../hooks/useQueueStatus";
+import { useToast } from "../hooks/useToast";
+import { ToastContainer } from "../components/Toast";
 
 const MODULE_NAMES = {
   character: 'चरित्र प्रमाण पत्र',
@@ -87,10 +89,60 @@ export default function Characters({
   const [policeStations, setPoliceStations] = useState([]);
   const tableRef = useRef(null);
 
+  // ── Toast notifications ───────────────────────────────────────────────────
+  const { toasts, addToast, removeToast } = useToast();
+
+  // ── SSE: called when queue:completed fires ────────────────────────────────
+  // Updates the matching table row in-place and shows a toast.
+  const handleQueueCompleted = useCallback((data) => {
+    const reqNum = String(data.request_number || '');
+    const preStatus = data.pre_Current_Status || null;
+    const perStatus = data.per_Current_Status || null;
+    const activeStatus = data.active_status || null;
+
+    // 1. Update the row in the table without re-fetching
+    setRows((prevRows) =>
+      prevRows.map((row) => {
+        const rowReqNum = String(row['अनुरोध_संख्या'] || row.request_number || '');
+        if (rowReqNum !== reqNum) return row;
+        return {
+          ...row,
+          ...(preStatus !== null ? { pre_Current_Status: preStatus } : {}),
+          ...(perStatus !== null ? { per_Current_Status: perStatus } : {}),
+          ...(activeStatus !== null ? { Current_Status: activeStatus } : {}),
+        };
+      })
+    );
+
+    // 2. Show toast with request number + new pre_Current_Status
+    const statusLabel = preStatus || activeStatus || 'Updated';
+    addToast({
+      type: statusLabel === 'APPROVED' ? 'success'
+           : statusLabel === 'REJECTED' ? 'error'
+           : 'info',
+      title: `✓ Request Number ${reqNum}`,
+      message: `New Status: ${statusLabel}`,
+      duration: 6000,
+    });
+  }, [addToast]);
+
+  // ── SSE: called when queue:failed fires ──────────────────────────────────
+  const handleQueueFailed = useCallback((data) => {
+    const reqNum = String(data.request_number || '');
+    addToast({
+      type: 'error',
+      title: `✕ Request ${reqNum}`,
+      message: data.message || 'Update Failed',
+      duration: 7000,
+    });
+  }, [addToast]);
+
   // ── Real-time queue status (shared across ALL browser tabs / users) ─────────
   // queueStatuses = { [request_number]: 'PENDING' | 'PROCESSING' }
-  // Updated live via SSE whenever any user clicks Update or the worker runs.
-  const { queueStatuses } = useQueueStatus();
+  const { queueStatuses } = useQueueStatus({
+    onCompleted: handleQueueCompleted,
+    onFailed: handleQueueFailed,
+  });
   // ────────────────────────────────────────────────────────────────────────────
 
   /**
@@ -101,7 +153,7 @@ export default function Characters({
   const handleRowStatusUpdate = (request_number, apiResponse) => {
     setRows((prevRows) =>
       prevRows.map((row) => {
-        const rowReqNum = row['अनुरोध_संख्या'] || row.request_number;
+        const rowReqNum = row.request_number;
         if (String(rowReqNum) !== String(request_number)) return row;
         return {
           ...row,
@@ -173,6 +225,9 @@ export default function Characters({
 
   return (
     <>
+      {/* ── Toast stack ─────────────────────────────────────────────── */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+
       <Navbar />
 
     <DateSearchHeader
@@ -212,28 +267,32 @@ export default function Characters({
             {error && (
               <tr><td colSpan="9" style={{ textAlign: 'center', color: 'red' }}>{error}</td></tr>
             )}
-            {!loading && rows.map((r, i) => (
-              <tr key={i}>
-                <td>{i + 1}</td>
-                <td>{r['थाना'] || r.pre_station_name}</td>
-                <td>{r['अनुरोध_संख्या'] || r.request_number}</td>
-                <td>{formatDate(r['अनुरोध_दिनांक'] || r.request_date)}</td>
-                <td>{r['आवेदक_का_नाम'] || r.applicant_name}</td>
-                {!hidePreAddCol && <td>{r.present_address}</td>}
-                <td>{r.pre_Current_Status}</td>
+            {!loading && rows.map((r, i) => {
+              const reqNum = r.request_number;
+              const isInQueue = !!queueStatuses[String(reqNum)];
+              return (
+                <tr key={i} className={isInQueue ? 'row--in-queue' : ''}>
+                  <td>{i + 1}</td>
+                  <td>{r.pre_station_name}</td>
+                  <td>{reqNum}</td>
+                  <td>{formatDate( r.request_date)}</td>
+                  <td>{r.applicant_name}</td>
+                  {!hidePreAddCol && <td>{r.present_address}</td>}
+                  <td>{r.pre_Current_Status}</td>
 
-                {!hidePraAddCol && <td>{ r.permanent_address}</td>}
-                {!hideStatusCol && <td>{ r.per_Current_Status}</td>}
-                <td>
-                  <UpdateButton
-                    type={type}
-                    request_number={r['अनुरोध_संख्या'] || r.request_number}
-                    queueStatus={queueStatuses[String(r['अनुरोध_संख्या'] || r.request_number)]}
-                    onStatusUpdate={handleRowStatusUpdate}
-                  />
-                </td>
-              </tr>
-            ))}
+                  {!hidePraAddCol && <td>{ r.permanent_address}</td>}
+                  {!hideStatusCol && <td>{ r.per_Current_Status}</td>}
+                  <td>
+                    <UpdateButton
+                      type={type}
+                      request_number={reqNum}
+                      queueStatus={queueStatuses[String(reqNum)]}
+                      onStatusUpdate={handleRowStatusUpdate}
+                    />
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

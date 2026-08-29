@@ -58,7 +58,8 @@ export default function UpdateButton({
     displayPhase = "processing";
   } else if (queueStatus === "PENDING") {
     displayPhase = "pending";
-  } else {
+  }
+  else {
     displayPhase = "idle";
   }
 

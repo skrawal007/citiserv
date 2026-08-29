@@ -791,7 +791,7 @@ async function processRequestBatch() {
     // ==================================================
     if (updatedDestinationRequests.length > 0) {
       const deleteIds = updatedDestinationRequests.map((item) => item.id);
-      // await pool.query(`DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`, deleteIds);
+       await pool.query(`DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`, deleteIds);
     }
 
     // ==================================================
@@ -805,7 +805,14 @@ async function processRequestBatch() {
         continue;
       }
       if (result.success) {
-        sse.broadcast("queue:completed", { request_number: String(request.request_no), type: result.type, status: "COMPLETED", active_status: result.data?.currentStatus || null });
+        sse.broadcast("queue:completed", {
+          request_number: String(request.request_no),
+          type: result.type,
+          status: "COMPLETED",
+          active_status: result.data?.currentStatus || null,
+          pre_Current_Status: result.data?.pre_Current_Status || null,
+          per_Current_Status: result.data?.per_Current_Status || null,
+        });
       } else {
         sse.broadcast("queue:failed", { request_number: String(request.request_no), type: request.request_type, status: "FAILED", message: result.message, active_status: result.data?.currentStatus || null });
       }

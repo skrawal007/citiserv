@@ -1089,3 +1089,102 @@ td a:hover {
 @keyframes update-spin {
   to { transform: rotate(360deg); }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Table row — in-queue highlight
+   Rows whose request is currently PENDING or PROCESSING get a
+   subtle animated left-border to draw the eye without being loud.
+   ═══════════════════════════════════════════════════════════════════ */
+@keyframes queue-pulse {
+  0%, 100% { background-color: transparent; }
+  50%       { background-color: rgba(59, 130, 246, 0.07); }
+}
+
+tr.row--in-queue {
+  animation: queue-pulse 2s ease-in-out infinite;
+  border-left: 3px solid #3b82f6;
+}
+
+tr.row--in-queue td:first-child {
+  border-left: 3px solid #3b82f6;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   Status cell — semantic colour chips
+   pre_Current_Status / per_Current_Status cells are given a
+   pill-shaped colour badge so status changes are immediately obvious.
+   The class is derived from the status value in Characters.jsx.
+   ═══════════════════════════════════════════════════════════════════ */
+.status-cell {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+/* APPROVED */
+.status-cell--approved {
+  color: #065f46;
+  background: #d1fae5;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* REJECTED */
+.status-cell--rejected {
+  color: #7f1d1d;
+  background: #fee2e2;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* PS (police station pending) */
+.status-cell--ps,
+.status-cell--psdcp,
+.status-cell--psdcrb,
+.status-cell--psliu,
+.status-cell--psdcrbliudcp {
+  color: #92400e;
+  background: #fef3c7;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* DCRB */
+.status-cell--dcrb,
+.status-cell--dcrbliu,
+.status-cell--dcrb dcp {
+  color: #1e40af;
+  background: #dbeafe;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* LIU */
+.status-cell--liu,
+.status-cell--liudcp {
+  color: #5b21b6;
+  background: #ede9fe;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* DCP */
+.status-cell--dcp {
+  color: #9d174d;
+  background: #fce7f3;
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Flash animation — plays once when the cell value changes */
+@keyframes status-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(59,130,246,0.55); }
+  70%  { box-shadow: 0 0 0 7px rgba(59,130,246,0); }
+  100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+}
+
+.status-cell {
+  animation: status-flash 0.7s ease-out;
+}
