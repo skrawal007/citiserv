@@ -3,10 +3,7 @@ const jwt = require("jsonwebtoken");
 const { pool } = require("../database/db");
 const { processExcelBuffer } = require("../utils/excelParser");
 const mysql = require("mysql2/promise");
-const {
-  submitRequestNumbers,
-  addRequestToQueue,
-} = require("../utils/statusChecker");
+const {submitRequestNumbers,addRequestToQueue,} = require("../utils/statusChecker");
 const sse = require("../utils/sseBroadcast");
 
 const {
@@ -1738,6 +1735,7 @@ const uploadFile = async (req, res, next) => {
 
 const updateStatus = async (req, res, next) => {
   const { type, request_number } = req.query;
+  const { userid, usertype } = req.user;
   console.log(" type ", type, "updateStatus request_number ", request_number);
   try {
     if (!request_number) {
@@ -1753,7 +1751,7 @@ const updateStatus = async (req, res, next) => {
       });
     }
 
-    const requestInsert = await addRequestToQueue(request_number, type);
+    const requestInsert = await addRequestToQueue(request_number, type, userid, usertype );
 
     // ── Real-time broadcast to ALL connected SSE clients ──────────────────
     // Every browser tab / user will immediately see this request as PENDING.

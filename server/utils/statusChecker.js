@@ -256,7 +256,6 @@ const submitRequestNumbers = async (requests) => {
           cells[1],
         );
 
-
         const data = {
           registrationNumber: cells[0] || "",
 
@@ -266,15 +265,15 @@ const submitRequestNumbers = async (requests) => {
 
           per_Current_Status: per_Current_Status,
 
-          district: cells[2] || "",
+          // district: cells[2] || "",
 
-          policeStation: cells[3] || "",
+          // policeStation: cells[3] || "",
 
-          applicationDate: cells[4] || "",
+          // applicationDate: cells[4] || "",
 
-          name: cells[5] || "",
+          // name: cells[5] || "",
 
-          address: cells[6] || "",
+          // address: cells[6] || "",
         };
 
         // ======================================================
@@ -300,7 +299,15 @@ const submitRequestNumbers = async (requests) => {
 
           success: true,
 
-          data,
+          // data,
+
+          registrationNumber: cells[0] || "",
+
+          currentStatus: cells[1].replace(/\s+/g, "") || "",
+
+          pre_Current_Status: pre_Current_Status,
+
+          per_Current_Status: per_Current_Status,
         });
       } catch (error) {
         // ======================================================
@@ -330,7 +337,6 @@ const submitRequestNumbers = async (requests) => {
     console.log(`\nBatch completed: ${results.length}/${requests.length}`);
 
     console.log(results);
-
 
     return {
       success: true,
@@ -366,19 +372,19 @@ const submitRequestNumbers = async (requests) => {
   }
 };
 
-const addRequestToQueue = async (requestNo, requestType) => {
+const addRequestToQueue = async (requestNo, requestType,  userid, usertype) => {
   try {
     const [result] = await pool.query(
       `
       INSERT INTO ver_request_queue
-          (request_no, request_type, status)
+          (request_no, request_type,userid,usertype,status )
       VALUES
-          (?, ?, 'PENDING')
+          (?, ?, ? , ?  , 'PENDING')
 
       ON DUPLICATE KEY UPDATE
           request_type = VALUES(request_type)
       `,
-      [requestNo, requestType],
+      [requestNo, requestType, userid, usertype ],
     );
 
     // Wake worker immediately
@@ -414,7 +420,6 @@ module.exports = {
 function parseCurrentStatus(current_status) {
   const status = current_status.replace(/\s+/g, "");
 
-
   // ==========================================
   // STATUS
   // ==========================================
@@ -432,7 +437,6 @@ function parseCurrentStatus(current_status) {
     per_Current_Status = getStatusCode(permanentAddress);
   }
 
-
   // --------------------------------
   // ALREADY APPROVED
   // --------------------------------
@@ -449,7 +453,7 @@ function parseCurrentStatus(current_status) {
       per_Current_Status: "",
     };
   }
-  
+
   // --------------------------------
   // REJECTED
   // --------------------------------
@@ -689,7 +693,7 @@ async function processRequestBatch() {
     const preStatusParams = [];
     const perStatusParams = [];
     const errorParams = [];
-    const whereParts = []; 
+    const whereParts = [];
     const whereParams = [];
 
     for (const request of requests) {
@@ -719,9 +723,9 @@ async function processRequestBatch() {
       }
 
       if (result.success) {
-        const active_status = result.data?.currentStatus || null;
-        const active_pre_status = result.data?.pre_Current_Status || null;
-        const active_per_status = result.data?.per_Current_Status || null;
+        const active_status = result.currentStatus || null;
+        const active_pre_status = result.pre_Current_Status || null;
+        const active_per_status = result.per_Current_Status || null;
 
         statusCase.push(`WHEN id = ? THEN 'COMPLETED'`);
         statusParams.push(request.id);
@@ -739,9 +743,9 @@ async function processRequestBatch() {
       }
 
       const errorMessage = result.message || "Request processing failed";
-      const active_status = result.data?.currentStatus || null;
-      const active_pre_status = result.data?.pre_Current_Status || null;
-      const active_per_status = result.data?.per_Current_Status || null;
+      const active_status = result.currentStatus || null;
+      const active_pre_status = result.pre_Current_Status || null;
+      const active_per_status = result.per_Current_Status || null;
 
       statusCase.push(`WHEN id = ? THEN 'FAILED'`);
       statusParams.push(request.id);
@@ -769,7 +773,14 @@ async function processRequestBatch() {
           error_message = CASE ${errorCase.join("\n")} ELSE error_message END
         WHERE ${whereParts.join(" OR ")}
       `;
-      const params = [...statusParams, ...statusValueParams, ...preStatusParams, ...perStatusParams, ...errorParams, ...whereParams];
+      const params = [
+        ...statusParams,
+        ...statusValueParams,
+        ...preStatusParams,
+        ...perStatusParams,
+        ...errorParams,
+        ...whereParams,
+      ];
       await pool.query(sql, params);
     }
 
@@ -778,10 +789,23 @@ async function processRequestBatch() {
     // ==================================================
     const completedRequests = [];
     for (const request of requests) {
-      const key = `${String(request.request_no).trim()}::${String(request.request_type || "").trim().toLowerCase()}`;
+      const key = `${String(request.request_no).trim()}::${String(
+        request.request_type || "",
+      )
+        .trim()
+        .toLowerCase()}`;
       const result = resultMap.get(key);
       if (result?.success) {
-        completedRequests.push({ id: request.id, request_no: request.request_no, request_type: request.request_type, result, data: result.data || null });
+        completedRequests.push({
+          id: request.id,
+          request_no: request.request_no,
+          request_type: request.request_type,
+          requestNo: result.requestNo,
+          currentStatus: result.currentStatus,
+          pre_Current_Status: result.pre_Current_Status,
+          per_Current_Status: result.per_Current_Status,
+          success: result.success,
+        });
       }
     }
 
@@ -790,7 +814,8 @@ async function processRequestBatch() {
     // ==================================================
     let updatedDestinationRequests = [];
     if (completedRequests.length > 0) {
-      updatedDestinationRequests = await updateCompletedVerificationRecords(completedRequests);
+      updatedDestinationRequests =
+        await updateCompletedVerificationRecords(completedRequests);
     }
 
     // ==================================================
@@ -798,17 +823,29 @@ async function processRequestBatch() {
     // ==================================================
     if (updatedDestinationRequests.length > 0) {
       const deleteIds = updatedDestinationRequests.map((item) => item.id);
-       await pool.query(`DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`, deleteIds);
+      // await pool.query(
+      //   `DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`,
+      //   deleteIds,
+      // );
     }
 
     // ==================================================
     // SSE NOTIFICATIONS
     // ==================================================
     for (const request of requests) {
-      const key = `${String(request.request_no).trim()}::${String(request.request_type || "").trim().toLowerCase()}`;
+      const key = `${String(request.request_no).trim()}::${String(
+        request.request_type || "",
+      )
+        .trim()
+        .toLowerCase()}`;
       const result = resultMap.get(key);
       if (!result) {
-        sse.broadcast("queue:failed", { request_number: String(request.request_no), type: request.request_type, status: "FAILED", message: "No result" });
+        sse.broadcast("queue:failed", {
+          request_number: String(request.request_no),
+          type: request.request_type,
+          status: "FAILED",
+          message: "No result",
+        });
         continue;
       }
       if (result.success) {
@@ -816,15 +853,20 @@ async function processRequestBatch() {
           request_number: String(request.request_no),
           type: result.type,
           status: "COMPLETED",
-          active_status: result.data?.currentStatus || null,
-          pre_Current_Status: result.data?.pre_Current_Status || null,
-          per_Current_Status: result.data?.per_Current_Status || null,
+          active_status: result.currentStatus || null,
+          pre_Current_Status: result.pre_Current_Status || null,
+          per_Current_Status: result.per_Current_Status || null,
         });
       } else {
-        sse.broadcast("queue:failed", { request_number: String(request.request_no), type: request.request_type, status: "FAILED", message: result.message, active_status: result.data?.currentStatus || null });
+        sse.broadcast("queue:failed", {
+          request_number: String(request.request_no),
+          type: request.request_type,
+          status: "FAILED",
+          message: result.message,
+          active_status: result.currentStatus || null,
+        });
       }
     }
-
   } catch (error) {
     console.error("processRequestBatch error:", error);
 
@@ -849,7 +891,9 @@ async function processRequestBatch() {
           [error.message, ...failIds],
         );
 
-        console.log(`Marked ${failIds.length} stuck PROCESSING records as FAILED`);
+        console.log(
+          `Marked ${failIds.length} stuck PROCESSING records as FAILED`,
+        );
       } catch (updateError) {
         console.error("Failed to mark batch as FAILED:", updateError);
       }
@@ -913,8 +957,6 @@ function getSepareteStatus(text) {
   };
 }
 
-
-
 const VERIFICATION_TABLES = {
   character: "characters",
   tenant: "tenants",
@@ -930,8 +972,8 @@ const VERIFICATION_TABLES = {
  * use different column names.
  */
 async function updateCompletedVerificationRecords(completedRequests) {
+  console.log(" completedRequests ", completedRequests);
 
-  console.log(" completedRequests ", completedRequests );
   if (!completedRequests || completedRequests.length === 0) {
     console.log("No completed requests to update in destination tables.");
     return [];
@@ -993,21 +1035,15 @@ async function updateCompletedVerificationRecords(completedRequests) {
       const requestNo = String(record.request_no).trim();
 
       requestNumbers.push(requestNo);
-
-      const currentStatus =
-        record.result?.data?.currentStatus ??
-        record.data?.currentStatus ??
-        null;
+      // console.log(" record ", record);
+      const currentStatus = record.currentStatus ?? null;
 
       const preStatus =
-        record.result?.data?.pre_Current_Status ??
-        record.data?.pre_Current_Status ??
+        record.pre_Current_Status ??
         null;
 
       const perStatus =
-        record.result?.data?.per_Current_Status ??
-        record.data?.per_Current_Status ??
-        null;
+        record.per_Current_Status ?? null;
 
       // -----------------------------------------------
       // Determine if this request has a terminal status
@@ -1019,7 +1055,8 @@ async function updateCompletedVerificationRecords(completedRequests) {
       // Same-station rows keep their existing per_Current_Status.
       // -----------------------------------------------
 
-      const isTerminalStatus = preStatus === "APPROVED" || preStatus === "REJECTED";
+      const isTerminalStatus =
+        preStatus === "APPROVED" || preStatus === "REJECTED";
 
       // -----------------------------------------------
       // current status  (always update)
@@ -1048,7 +1085,7 @@ async function updateCompletedVerificationRecords(completedRequests) {
 
       if (isTerminalStatus) {
         perStatusCase.push(
-          `WHEN request_number = ? AND per_station_code <> pre_station_code THEN ?`
+          `WHEN request_number = ? AND per_station_code <> pre_station_code THEN ?`,
         );
       } else {
         perStatusCase.push(`WHEN request_number = ? THEN ?`);
@@ -1099,9 +1136,9 @@ async function updateCompletedVerificationRecords(completedRequests) {
 
     const [result] = await pool.query(sql, params);
 
-    console.log(
-      `${tableName}: matched=${result.affectedRows}`,
-    );
+    // console.log(mysql.format(sql,params));
+
+    console.log(`${tableName}: matched=${result.affectedRows}`);
 
     // --------------------------------------------------
     // Keep only requests that were actually updated
