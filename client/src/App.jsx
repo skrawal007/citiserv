@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { AuthProvider } from "./context/AuthContext";
 import { QueueProvider } from "./context/QueueContext";
+import GlobalToast from "./components/GlobalToast";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -26,6 +27,7 @@ export default function App() {
   return (
     <AuthProvider>
       <QueueProvider>
+        <GlobalToast />
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />

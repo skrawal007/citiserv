@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import Navbar from '../components/Navbar';
@@ -8,37 +8,85 @@ import DateSearchHeader from "../components/dashboard/DateSearchHeader";
 import UpdateButton from "../components/UpdateButton";
 import useQueueStatus from "../hooks/useQueueStatus";
 import { useQueue } from "../context/QueueContext";
-import { useToast } from "../hooks/useToast";
-import { ToastContainer } from "../components/Toast";
+
+// Toast is now global (GlobalToast in App.jsx) — no local import needed.
+
+// const MODULE_NAMES = {
+//   character: 'चरित्र प्रमाण पत्र',
+//   tenant: 'किरायेदार सत्यापन',
+//   domestic: 'घरेलू सहायक सत्यापन',
+//   employee: 'कर्मचारी सत्यापन',
+//   complaint: 'शिकायत निवारण',
+//   all: 'सत्यापन',
+// };
 
 const MODULE_NAMES = {
-  character: 'चरित्र प्रमाण पत्र',
-  tenant: 'किरायेदार सत्यापन',
-  domestic: 'घरेलू सहायक सत्यापन',
-  employee: 'कर्मचारी सत्यापन',
-  complaint: 'शिकायत निवारण',
-  all: 'सत्यापन',
+  character: 'Character Certificate',
+  tenant: 'Tenant Verification',
+  domestic: 'Domestic Help Verification',
+  employee: 'Employee Verification',
+  complaint: 'Complaint Redressal',
+  all: 'Verification',
 };
 
-const LOC_HEADINGS = {
-  // Long names
-  totaldcp:     'कुल डीसीपी पर लम्बित',
-  totalliu:     'कुल एलआईयू पर लम्बित',
-  totaldcrb:    'कुल डीसीआरबी पर लम्बित',
-  totalps:      'कुल थानों पर लम्बित',
-  totalremain:  'समस्त लम्बित',
-  totaldiff:    'अन्य थानों से सम्बन्धित लम्बित',
-  OTHER_TO_OWN_PS: 'अन्य थानों से सम्बन्धित लम्बित',
+// const LOC_HEADINGS = {
+//   // Long names
+//   totaldcp:     'कुल डीसीपी पर लम्बित',
+//   totalliu:     'कुल एलआईयू पर लम्बित',
+//   totaldcrb:    'कुल डीसीआरबी पर लम्बित',
+//   totalps:      'कुल थानों पर लम्बित',
+//   totalremain:  'समस्त लम्बित',
+//   totaldiff:    'अन्य थानों से सम्बन्धित लम्बित',
+//   OTHER_TO_OWN_PS: 'अन्य थानों से सम्बन्धित लम्बित',
   
+//   // Short names
+//   all:          'कुल प्राप्त',
+//   remain:       'कुल लम्बित',
+//   ps:           'थानों पर लम्बित',
+//   dcrb:         'डीसीआरबी पर लम्बित',
+//   liu:          'एलआईयू पर लम्बित',
+//   dcp:          'डीसीपी पर लम्बित',
+//   own_to_other: 'अन्य थानों से सम्बन्धित लम्बित',
+//   other_to_own: 'अन्य थानों से सम्बन्धित लम्बित',
+// };
+
+
+const LOC_HEADINGS = {
+
+  // Long names
+
+  totaldcp:     'Total Pending at DCP',
+
+  totalliu:     'Total Pending at LIU',
+
+  totaldcrb:    'Total Pending at DCRB',
+
+  totalps:      'Total Pending at Police Stations',
+
+  totalremain:  'Total Pending',
+
+  totaldiff:    'Pending Related to Other Police Stations',
+
+  OTHER_TO_OWN_PS: 'Pending Related to Other Police Stations',
+
   // Short names
-  all:          'कुल प्राप्त',
-  remain:       'कुल लम्बित',
-  ps:           'थानों पर लम्बित',
-  dcrb:         'डीसीआरबी पर लम्बित',
-  liu:          'एलआईयू पर लम्बित',
-  dcp:          'डीसीपी पर लम्बित',
-  own_to_other: 'अन्य थानों से सम्बन्धित लम्बित',
-  other_to_own: 'अन्य थानों से सम्बन्धित लम्बित',
+
+  all:          'Total Received',
+
+  remain:       'Total Pending',
+
+  ps:           'Pending at Police Stations',
+
+  dcrb:         'Pending at DCRB',
+
+  liu:          'Pending at LIU',
+
+  dcp:          'Pending at DCP',
+
+  own_to_other: 'Pending Related to Other Police Stations',
+
+  other_to_own: 'Pending Related to Other Police Stations',
+
 };
 
 const LIST_ENDPOINTS = {
@@ -90,79 +138,47 @@ export default function Characters({
   const [policeStations, setPoliceStations] = useState([]);
   const tableRef = useRef(null);
 
-  // ── Toast notifications ───────────────────────────────────────────────────
-  const { toasts, addToast, removeToast } = useToast();
+  // ── Real-time queue status (button states: PENDING / PROCESSING) ──────────
+  const { queueStatuses } = useQueueStatus();
 
-  // ── SSE: called when queue:completed fires ────────────────────────────────
-  // Updates the matching table row in-place and shows a toast.
-  const handleQueueCompleted = useCallback((data) => {
-    const reqNum = String(data.request_number || '');
-    const preStatus = data.pre_Current_Status || null;
-    const perStatus = data.per_Current_Status || null;
+  // ── Row-update subscription ───────────────────────────────────────────────
+  // When queue:completed fires for a request that belongs to this table,
+  // patch the row's status columns in-place — no full-table reload needed.
+  // Toast is handled globally by GlobalToast in App.jsx.
+  const { subscribeCompleted } = useQueue();
+  const rowUpdateRef = useRef(null);
+
+  // Always points to the latest setRows closure (updated every render)
+  rowUpdateRef.current = (data) => {
+    const reqNum      = String(data.request_number || '');
+    const preStatus   = data.pre_Current_Status || null;
+    const perStatus   = data.per_Current_Status || null;
     const activeStatus = data.active_status || null;
-    const requestType = data.type || null ; 
 
-    // 1. Update the row in the table without re-fetching
     setRows((prevRows) =>
       prevRows.map((row) => {
-        const rowReqNum = String(row.request_number || '');
-        if (rowReqNum !== reqNum) return row;
+        if (String(row.request_number || '') !== reqNum) return row;
         return {
           ...row,
-          ...(preStatus !== null ? { pre_Current_Status: preStatus } : {}),
-          ...(perStatus !== null ? { per_Current_Status: perStatus } : {}),
-          ...(activeStatus !== null ? { Current_Status: activeStatus } : {}),
+          ...(preStatus    !== null ? { pre_Current_Status: preStatus    } : {}),
+          ...(perStatus    !== null ? { per_Current_Status: perStatus    } : {}),
+          ...(activeStatus !== null ? { Current_Status:     activeStatus } : {}),
         };
       })
     );
+  };
 
-    // 2. Show toast with request number + new pre_Current_Status
-    const statusLabel = preStatus || activeStatus || 'Updated';
-    addToast({
-      type: statusLabel === 'APPROVED' ? 'success'
-           : statusLabel === 'REJECTED' ? 'error'
-           : 'info',
-      title: `${requestType} :  ${reqNum}`,
-      message: `New Status: ${statusLabel}`,
-      duration: 6000,
-    });
-  }, [addToast]);
-
-  // ── SSE: called when queue:failed fires ──────────────────────────────────
-  const handleQueueFailed = useCallback((data) => {
-    const reqNum = String(data.request_number || '');
-    addToast({
-      type: 'error',
-      title: `✕ Request ${reqNum}`,
-      message: data.message || 'Update Failed',
-      duration: 7000,
-    });
-  }, [addToast]);
-
-  // ── Real-time queue status (live map from global SSE in QueueContext) ───────
-  // queueStatuses = { [request_number]: 'PENDING' | 'PROCESSING' }
-  const { queueStatuses } = useQueueStatus();
-
-  // ── Subscribe to completion / failure events ONLY while this page is mounted ─
-  // subscribeCompleted returns an unsubscribe fn → called on unmount automatically.
-  // This is the key fix: when the user navigates away from /characters,
-  // these listeners are removed and no toast fires on other pages.
-  const { subscribeCompleted, subscribeFailed } = useQueue();
-
+  // Subscribe once on mount — stable wrapper ensures no subscribe/unsubscribe gap
   useEffect(() => {
-    const unsubComplete = subscribeCompleted(handleQueueCompleted);
-    const unsubFailed   = subscribeFailed(handleQueueFailed);
-    return () => {
-      unsubComplete();
-      unsubFailed();
-    };
-  }, [subscribeCompleted, subscribeFailed, handleQueueCompleted, handleQueueFailed]);
-  // ────────────────────────────────────────────────────────────────────────────
+    const onCompleted = (data) => rowUpdateRef.current?.(data);
+    return subscribeCompleted(onCompleted);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally empty — subscribe once for the component lifetime
+  // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Optional callback from UpdateButton after the HTTP POST completes.
-   * Merges any fresh status fields returned by the server into the specific row
-   * — no full-table reload needed.
+   * Callback from UpdateButton after the HTTP POST completes.
+   * Merges any status fields returned immediately by the server.
    */
   const handleRowStatusUpdate = (request_number, apiResponse) => {
     setRows((prevRows) =>
@@ -214,7 +230,6 @@ export default function Characters({
           if (prev.length > 0 && selectedPoliceStation) return prev;
           return stations.length > 0 ? stations : prev;
         });
-        // console.log(" res.data ", res.data);
 
       } catch (e) {
         setError(e.response?.data?.error || e.message);
@@ -222,7 +237,6 @@ export default function Characters({
         setLoading(false);
       }
     };
-    // console.log("hidePreAdd ", hidePreAdd(type));
 
     fetchData();
   }, [loc, type, sdate, edate, selectedPoliceStation, days]);
@@ -235,26 +249,21 @@ export default function Characters({
   const hidePraAddCol = hidePraAdd(loc);
   const hidePreAddCol = hidePreAdd(type);
 
-
-
   return (
     <>
-      {/* ── Toast stack ─────────────────────────────────────────────── */}
-      <ToastContainer toasts={toasts} removeToast={removeToast} />
-
       <Navbar />
 
-    <DateSearchHeader
-            showSearch={showSearch}
-            setShowSearch={setShowSearch}
-            sdate={sdate}
-            setSdate={setSdate}
-            edate={edate}
-            setEdate={setEdate}
-            policeStations={policeStations}
-            selectedPoliceStation={selectedPoliceStation}
-            setSelectedPoliceStation={setSelectedPoliceStation}
-              />
+      <DateSearchHeader
+        showSearch={showSearch}
+        setShowSearch={setShowSearch}
+        sdate={sdate}
+        setSdate={setSdate}
+        edate={edate}
+        setEdate={setEdate}
+        policeStations={policeStations}
+        selectedPoliceStation={selectedPoliceStation}
+        setSelectedPoliceStation={setSelectedPoliceStation}
+      />
       <div className="table-wrapper">
         <table id="printable" ref={tableRef}>
           <thead>
@@ -289,13 +298,16 @@ export default function Characters({
                   <td>{i + 1}</td>
                   <td>{r.pre_station_name}</td>
                   <td>{reqNum}</td>
-                  <td>{formatDate( r.request_date)}</td>
+                  <td>{formatDate(r.request_date)}</td>
                   <td>{r.applicant_name}</td>
                   {!hidePreAddCol && <td>{r.present_address}</td>}
-                  <td>{r.pre_Current_Status}</td>
-
-                  {!hidePraAddCol && <td>{ r.permanent_address}</td>}
-                  {!hideStatusCol && <td>{ r.per_Current_Status}</td>}
+                  <td> {r.pre_Current_Status}
+                  </td>
+                  {!hidePraAddCol && <td>{r.permanent_address}</td>}
+                  {!hideStatusCol && (
+                    <td>{r.per_Current_Status}
+                    </td>
+                  )}
                   <td>
                     <UpdateButton
                       type={type}

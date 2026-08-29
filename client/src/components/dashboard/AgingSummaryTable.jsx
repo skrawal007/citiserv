@@ -111,7 +111,7 @@ export default function AgingSummaryTable({ setSdate, setEdate }) {
     <div className="table-wrapper image-styled-table-wrapper card-upgrade">
       <div className="table-header-title">
         <h3>
-          📊 आवेदन प्रकार समय-सीमा स्थिति (Aging Summary)
+          📊 Aging Summary
         </h3>
       </div>
 

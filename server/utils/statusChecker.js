@@ -443,6 +443,13 @@ function parseCurrentStatus(current_status) {
     };
   }
 
+  if (status === "अस्वीकृत") {
+    return {
+      pre_Current_Status: ver_status["अस्वीकृत"],
+      per_Current_Status: "",
+    };
+  }
+  
   // --------------------------------
   // REJECTED
   // --------------------------------
