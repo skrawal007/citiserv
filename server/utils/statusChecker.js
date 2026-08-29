@@ -823,10 +823,10 @@ async function processRequestBatch() {
     // ==================================================
     if (updatedDestinationRequests.length > 0) {
       const deleteIds = updatedDestinationRequests.map((item) => item.id);
-      // await pool.query(
-      //   `DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`,
-      //   deleteIds,
-      // );
+      await pool.query(
+        `DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`,
+        deleteIds,
+      );
     }
 
     // ==================================================

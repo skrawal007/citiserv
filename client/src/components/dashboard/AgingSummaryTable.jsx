@@ -2,11 +2,15 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE } from '../../config/env';
 import { Link } from 'react-router-dom';
+import { useQueue } from '../../context/QueueContext';
 
 export default function AgingSummaryTable({ setSdate, setEdate }) {
   const [stationRows, setStationRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Re-fetch whenever a queued job finishes
+  const { dashboardRefreshKey } = useQueue();
 
   const detailLink = (typeKey, daysRange) => {
     let url = `/characters?type=${typeKey}&loc=remain`;
@@ -20,7 +24,7 @@ export default function AgingSummaryTable({ setSdate, setEdate }) {
 
   useEffect(() => {
     loadStationData();
-  }, []);
+  }, [dashboardRefreshKey]);
 
   async function loadStationData() {
     setLoading(true);

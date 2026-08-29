@@ -30,6 +30,8 @@ const QueueContext = createContext(null);
 
 export function QueueProvider({ children }) {
   const [queueStatuses, setQueueStatuses] = useState({});
+  // Incremented every time a job completes/fails so dashboard tables know to re-fetch
+  const [dashboardRefreshKey, setDashboardRefreshKey] = useState(0);
 
   // Sets of listener functions registered by mounted components
   const completedListeners = useRef(new Set());
@@ -99,6 +101,8 @@ export function QueueProvider({ children }) {
           applyUpdate(data.request_number, 'COMPLETED');
           // Notify only currently-registered listeners (mounted components)
           completedListeners.current.forEach((fn) => fn(data));
+          // Bump the dashboard refresh key so overview tables re-fetch
+          setDashboardRefreshKey((k) => k + 1);
         } catch (err) {
           console.error('[QueueContext] SSE completed parse error:', err);
         }
@@ -110,6 +114,8 @@ export function QueueProvider({ children }) {
           applyUpdate(data.request_number, 'FAILED');
           // Notify only currently-registered listeners (mounted components)
           failedListeners.current.forEach((fn) => fn(data));
+          // Bump the dashboard refresh key so overview tables re-fetch
+          setDashboardRefreshKey((k) => k + 1);
         } catch (err) {
           console.error('[QueueContext] SSE failed parse error:', err);
         }
@@ -158,7 +164,7 @@ export function QueueProvider({ children }) {
 
   return (
     <QueueContext.Provider
-      value={{ queueStatuses, subscribeCompleted, subscribeFailed }}
+      value={{ queueStatuses, subscribeCompleted, subscribeFailed, dashboardRefreshKey }}
     >
       {children}
     </QueueContext.Provider>

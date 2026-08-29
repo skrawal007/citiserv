@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
 import { API_BASE } from '../../config/env';
+import { useQueue } from '../../context/QueueContext';
 
 // Keep the initial dashboard response for this browser page session. React
 // Strict Mode may remount this component in development; a remount must not
@@ -41,9 +42,16 @@ export default function CombinedDashboardModule({ activeFilter, sdate, edate}) {
   const [maxDate, setMaxDate] = useState('');
   const [showSearch, setShowSearch] = useState(false);
 
+  // Re-fetch whenever a queued job finishes
+  const { dashboardRefreshKey } = useQueue();
+
   useEffect(() => {
-    loadStationData(sdate,edate);
-  }, [sdate,edate]);
+    // On a queue-triggered refresh, invalidate the cache so fresh data arrives
+    if (dashboardRefreshKey > 0) {
+      initialDashboardRequest = null;
+    }
+    loadStationData(sdate, edate);
+  }, [sdate, edate, dashboardRefreshKey]);
 
   async function loadStationData(sdate, edate) {
     setLoading(true);
