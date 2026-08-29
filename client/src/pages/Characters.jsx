@@ -7,6 +7,7 @@ import getAuthConfig from "../functions/getAuthConfig";
 import DateSearchHeader from "../components/dashboard/DateSearchHeader";
 import UpdateButton from "../components/UpdateButton";
 import useQueueStatus from "../hooks/useQueueStatus";
+import { useQueue } from "../context/QueueContext";
 import { useToast } from "../hooks/useToast";
 import { ToastContainer } from "../components/Toast";
 
@@ -99,11 +100,12 @@ export default function Characters({
     const preStatus = data.pre_Current_Status || null;
     const perStatus = data.per_Current_Status || null;
     const activeStatus = data.active_status || null;
+    const requestType = data.type || null ; 
 
     // 1. Update the row in the table without re-fetching
     setRows((prevRows) =>
       prevRows.map((row) => {
-        const rowReqNum = String(row['अनुरोध_संख्या'] || row.request_number || '');
+        const rowReqNum = String(row.request_number || '');
         if (rowReqNum !== reqNum) return row;
         return {
           ...row,
@@ -120,7 +122,7 @@ export default function Characters({
       type: statusLabel === 'APPROVED' ? 'success'
            : statusLabel === 'REJECTED' ? 'error'
            : 'info',
-      title: `✓ Request Number ${reqNum}`,
+      title: `${requestType} :  ${reqNum}`,
       message: `New Status: ${statusLabel}`,
       duration: 6000,
     });
@@ -137,12 +139,24 @@ export default function Characters({
     });
   }, [addToast]);
 
-  // ── Real-time queue status (shared across ALL browser tabs / users) ─────────
+  // ── Real-time queue status (live map from global SSE in QueueContext) ───────
   // queueStatuses = { [request_number]: 'PENDING' | 'PROCESSING' }
-  const { queueStatuses } = useQueueStatus({
-    onCompleted: handleQueueCompleted,
-    onFailed: handleQueueFailed,
-  });
+  const { queueStatuses } = useQueueStatus();
+
+  // ── Subscribe to completion / failure events ONLY while this page is mounted ─
+  // subscribeCompleted returns an unsubscribe fn → called on unmount automatically.
+  // This is the key fix: when the user navigates away from /characters,
+  // these listeners are removed and no toast fires on other pages.
+  const { subscribeCompleted, subscribeFailed } = useQueue();
+
+  useEffect(() => {
+    const unsubComplete = subscribeCompleted(handleQueueCompleted);
+    const unsubFailed   = subscribeFailed(handleQueueFailed);
+    return () => {
+      unsubComplete();
+      unsubFailed();
+    };
+  }, [subscribeCompleted, subscribeFailed, handleQueueCompleted, handleQueueFailed]);
   // ────────────────────────────────────────────────────────────────────────────
 
   /**
