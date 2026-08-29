@@ -276,7 +276,7 @@ export default function Characters({
               <th>REQUEST NUMBER</th>
               <th>REQUEST DATE</th>
               <th>APPLICANT NAME</th>
-               {!hidePreAddCol && <th>PRESENT ADDRESS</th>}
+              {!hidePreAddCol && <th>PRESENT ADDRESS</th>}
               {!hidePreAddCol ?  <th> PRESENT ADD STATUS</th> :  <th> STATUS</th> }
               {!hidePraAddCol && <th>PERMANENT ADDRESS</th>}
               {!hideStatusCol && <th> PERMANENT ADD STATUS</th>}

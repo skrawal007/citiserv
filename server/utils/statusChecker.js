@@ -12,6 +12,7 @@ const MAX_REQUESTS = 100;
 const WAIT_TIME = 10 * 1000;
 
 const submitRequestNumbers = async (requests) => {
+
   let browser;
   const results = [];
 
@@ -570,6 +571,9 @@ function clearQueueTimer() {
 }
 
 async function processRequestBatch() {
+
+  console.log(" processRequestBatch start ...... "); 
+
   if (processing) {
     console.log("Batch already processing...");
     return;
@@ -655,13 +659,15 @@ async function processRequestBatch() {
 
     const batchResult = await submitRequestNumbers(submitRequests);
 
+
+
     console.log("Batch result:", {
       success: batchResult.success,
       total: batchResult.total,
       processed: batchResult.processed,
     });
 
-    // console.log("results ", batchResult.results);
+    //  console.log("results ", batchResult.results);
 
     // ==================================================
     // Create result lookup
@@ -808,6 +814,9 @@ async function processRequestBatch() {
         });
       }
     }
+
+
+    // console.log(" completedRequests ", completedRequests);
 
     // ==================================================
     // UPDATE DESTINATION TABLES
@@ -962,6 +971,8 @@ const VERIFICATION_TABLES = {
   tenant: "tenants",
   employee: "employees",
   domestic: "domestic",
+  complaint : "complaints",
+  postmortem: "postmortem"
 };
 
 /**
@@ -1035,15 +1046,12 @@ async function updateCompletedVerificationRecords(completedRequests) {
       const requestNo = String(record.request_no).trim();
 
       requestNumbers.push(requestNo);
-      // console.log(" record ", record);
+      console.log(" record ", record);
       const currentStatus = record.currentStatus ?? null;
 
-      const preStatus =
-        record.pre_Current_Status ??
-        null;
+      const preStatus = record.pre_Current_Status ?? null;
 
-      const perStatus =
-        record.per_Current_Status ?? null;
+      const perStatus = record.per_Current_Status ?? null;
 
       // -----------------------------------------------
       // Determine if this request has a terminal status
@@ -1055,8 +1063,7 @@ async function updateCompletedVerificationRecords(completedRequests) {
       // Same-station rows keep their existing per_Current_Status.
       // -----------------------------------------------
 
-      const isTerminalStatus =
-        preStatus === "APPROVED" || preStatus === "REJECTED";
+      const isTerminalStatus = preStatus === "APPROVED" || preStatus === "REJECTED";
 
       // -----------------------------------------------
       // current status  (always update)
@@ -1083,7 +1090,7 @@ async function updateCompletedVerificationRecords(completedRequests) {
       // All other statuses   →  always update (existing logic).
       // -----------------------------------------------
 
-      if (isTerminalStatus) {
+      if (isTerminalStatus && tableName !=='complaints') {
         perStatusCase.push(
           `WHEN request_number = ? AND per_station_code <> pre_station_code THEN ?`,
         );
@@ -1103,6 +1110,17 @@ async function updateCompletedVerificationRecords(completedRequests) {
 
     const placeholders = requestNumbers.map(() => "?").join(",");
 
+    const perStatusUpdate = tableName != "domstic"
+        ? `
+        pre_Current_Status = CASE
+          ${perStatusCase.join("\n          ")}
+          ELSE pre_Current_Status
+        END,
+        `
+        : "";
+
+
+
     const sql = `
       UPDATE ${tableName}
       SET
@@ -1111,15 +1129,13 @@ async function updateCompletedVerificationRecords(completedRequests) {
           ELSE Current_Status
         END,
 
+        
         pre_Current_Status = CASE
           ${preStatusCase.join("\n          ")}
           ELSE pre_Current_Status
         END,
 
-        per_Current_Status = CASE
-          ${perStatusCase.join("\n          ")}
-          ELSE per_Current_Status
-        END,
+        ${perStatusUpdate} 
 
         status_update_time = NOW(),
 

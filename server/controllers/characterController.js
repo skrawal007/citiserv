@@ -408,7 +408,7 @@ const complaintList = async (req, res, next) => {
 
     query += ` ORDER BY request_date;`;
 
-    console.log(mysql.format(query, params));
+    // console.log(mysql.format(query, params));
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
@@ -482,7 +482,8 @@ const postmortemList = async (req, res, next) => {
 
     query += ` ORDER BY request_date;`;
 
-    console.log(mysql.format(query, params));
+     console.log(mysql.format(query, params));
+    
     const [rows] = await pool.execute(query, params);
     return res.json(rows);
   } catch (err) {
