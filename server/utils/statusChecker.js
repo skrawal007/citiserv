@@ -256,6 +256,7 @@ const submitRequestNumbers = async (requests) => {
           cells[1],
         );
 
+
         const data = {
           registrationNumber: cells[0] || "",
 
@@ -327,6 +328,9 @@ const submitRequestNumbers = async (requests) => {
     // ==========================================================
 
     console.log(`\nBatch completed: ${results.length}/${requests.length}`);
+
+    console.log(results);
+
 
     return {
       success: true,
@@ -410,7 +414,6 @@ module.exports = {
 function parseCurrentStatus(current_status) {
   const status = current_status.replace(/\s+/g, "");
 
-  console.log(" status ", status);
 
   // ==========================================
   // STATUS
@@ -429,12 +432,6 @@ function parseCurrentStatus(current_status) {
     per_Current_Status = getStatusCode(permanentAddress);
   }
 
-  console.log(
-    " pre_Current_Status ",
-    pre_Current_Status,
-    " per_Current_Status ",
-    per_Current_Status,
-  );
 
   // --------------------------------
   // ALREADY APPROVED
@@ -653,7 +650,7 @@ async function processRequestBatch() {
       processed: batchResult.processed,
     });
 
-    console.log("results ", batchResult.results);
+    // console.log("results ", batchResult.results);
 
     // ==================================================
     // Create result lookup
@@ -670,18 +667,6 @@ async function processRequestBatch() {
 
       resultMap.set(key, result);
     }
-
-    // ==================================================
-    // BULK UPDATE ver_request_queue
-    //
-    // Updates:
-    //   status
-    //   active_status
-    //   completed_at
-    //   error_message
-    //
-    // One SQL query for the whole batch
-    // ==================================================
 
     // ==================================================
     // BULK UPDATE ver_request_queue
@@ -709,299 +694,160 @@ async function processRequestBatch() {
 
       const result = resultMap.get(key);
 
-      // --------------------------------------------------
-      // No result returned
-      // --------------------------------------------------
-
       if (!result) {
         const errorMessage = "No result returned from submitRequestNumbers";
-
         statusCase.push(`WHEN id = ? THEN 'FAILED'`);
         statusParams.push(request.id);
-
         statusValueCase.push(`WHEN id = ? THEN ?`);
         statusValueParams.push(request.id, null);
-
         preStatusCase.push(`WHEN id = ? THEN ?`);
         preStatusParams.push(request.id, null);
-
         perStatusCase.push(`WHEN id = ? THEN ?`);
         perStatusParams.push(request.id, null);
-
         errorCase.push(`WHEN id = ? THEN ?`);
         errorParams.push(request.id, errorMessage);
-
         whereParts.push(`id = ?`);
         whereParams.push(request.id);
-
         continue;
       }
 
-      // --------------------------------------------------
-      // SUCCESS
-      // --------------------------------------------------
       if (result.success) {
         const active_status = result.data?.currentStatus || null;
-
         const active_pre_status = result.data?.pre_Current_Status || null;
-
         const active_per_status = result.data?.per_Current_Status || null;
 
-        // status
         statusCase.push(`WHEN id = ? THEN 'COMPLETED'`);
         statusParams.push(request.id);
-
-        // current Hindi status
         statusValueCase.push(`WHEN id = ? THEN ?`);
         statusValueParams.push(request.id, active_status);
-
-        // present address status
         preStatusCase.push(`WHEN id = ? THEN ?`);
         preStatusParams.push(request.id, active_pre_status);
-
-        // permanent address status
         perStatusCase.push(`WHEN id = ? THEN ?`);
         perStatusParams.push(request.id, active_per_status);
-
-        // error
         errorCase.push(`WHEN id = ? THEN NULL`);
         errorParams.push(request.id);
-
         whereParts.push(`id = ?`);
         whereParams.push(request.id);
-
         continue;
       }
 
-      // --------------------------------------------------
-      // FAILED
-      // --------------------------------------------------
       const errorMessage = result.message || "Request processing failed";
-
       const active_status = result.data?.currentStatus || null;
-
       const active_pre_status = result.data?.pre_Current_Status || null;
-
       const active_per_status = result.data?.per_Current_Status || null;
 
       statusCase.push(`WHEN id = ? THEN 'FAILED'`);
       statusParams.push(request.id);
-
       statusValueCase.push(`WHEN id = ? THEN ?`);
       statusValueParams.push(request.id, active_status);
-
       preStatusCase.push(`WHEN id = ? THEN ?`);
       preStatusParams.push(request.id, active_pre_status);
-
       perStatusCase.push(`WHEN id = ? THEN ?`);
       perStatusParams.push(request.id, active_per_status);
-
       errorCase.push(`WHEN id = ? THEN ?`);
       errorParams.push(request.id, errorMessage);
-
       whereParts.push(`id = ?`);
       whereParams.push(request.id);
     }
 
+    if (whereParts.length > 0) {
+      const sql = `
+        UPDATE ver_request_queue
+        SET
+          status = CASE ${statusCase.join("\n")} ELSE status END,
+          active_status = CASE ${statusValueCase.join("\n")} ELSE active_status END,
+          active_pre_status = CASE ${preStatusCase.join("\n")} ELSE active_pre_status END,
+          active_per_status = CASE ${perStatusCase.join("\n")} ELSE active_per_status END,
+          completed_at = NOW(),
+          error_message = CASE ${errorCase.join("\n")} ELSE error_message END
+        WHERE ${whereParts.join(" OR ")}
+      `;
+      const params = [...statusParams, ...statusValueParams, ...preStatusParams, ...perStatusParams, ...errorParams, ...whereParams];
+      await pool.query(sql, params);
+    }
+
     // ==================================================
-    // EXECUTE ONE BULK UPDATE
+    // FIND SUCCESSFULLY COMPLETED REQUESTS
     // ==================================================
+    const completedRequests = [];
+    for (const request of requests) {
+      const key = `${String(request.request_no).trim()}::${String(request.request_type || "").trim().toLowerCase()}`;
+      const result = resultMap.get(key);
+      if (result?.success) {
+        completedRequests.push({ id: request.id, request_no: request.request_no, request_type: request.request_type, result, data: result.data || null });
+      }
+    }
 
-if (whereParts.length > 0) {
-  const sql = `
-    UPDATE ver_request_queue
-    SET
+    // ==================================================
+    // UPDATE DESTINATION TABLES
+    // ==================================================
+    let updatedDestinationRequests = [];
+    if (completedRequests.length > 0) {
+      updatedDestinationRequests = await updateCompletedVerificationRecords(completedRequests);
+    }
 
-      status = CASE
-        ${statusCase.join("\n")}
-        ELSE status
-      END,
-
-      active_status = CASE
-        ${statusValueCase.join("\n")}
-        ELSE active_status
-      END,
-
-      active_pre_status = CASE
-        ${preStatusCase.join("\n")}
-        ELSE active_pre_status
-      END,
-
-      active_per_status = CASE
-        ${perStatusCase.join("\n")}
-        ELSE active_per_status
-      END,
-
-      completed_at = NOW(),
-
-      error_message = CASE
-        ${errorCase.join("\n")}
-        ELSE error_message
-      END
-
-    WHERE ${whereParts.join(" OR ")}
-  `;
-
-  const params = [
-    ...statusParams,
-
-    ...statusValueParams,
-
-    ...preStatusParams,
-
-    ...perStatusParams,
-
-    ...errorParams,
-
-    ...whereParams,
-  ];
-
-  console.log("QUEUE UPDATE SQL:");
-  console.log(mysql.format(sql, params));
-
-  await pool.query(sql, params);
-
-  console.log(
-    `Bulk updated ${requests.length} queue records`
-  );
-}
+    // ==================================================
+    // DELETE ONLY SUCCESSFULLY UPDATED REQUESTS
+    // ==================================================
+    if (updatedDestinationRequests.length > 0) {
+      const deleteIds = updatedDestinationRequests.map((item) => item.id);
+      // await pool.query(`DELETE FROM ver_request_queue WHERE id IN (${deleteIds.map(() => "?").join(",")}) AND status = 'COMPLETED'`, deleteIds);
+    }
 
     // ==================================================
     // SSE NOTIFICATIONS
     // ==================================================
-
     for (const request of requests) {
-      const key = `${String(request.request_no).trim()}::${String(
-        request.request_type || "",
-      )
-        .trim()
-        .toLowerCase()}`;
-
+      const key = `${String(request.request_no).trim()}::${String(request.request_type || "").trim().toLowerCase()}`;
       const result = resultMap.get(key);
-
-      // -----------------------------------------------
-      // No result
-      // -----------------------------------------------
-
       if (!result) {
-        sse.broadcast("queue:failed", {
-          request_number: String(request.request_no),
-          type: request.request_type,
-          status: "FAILED",
-          message: "No result returned from submitRequestNumbers",
-        });
-
+        sse.broadcast("queue:failed", { request_number: String(request.request_no), type: request.request_type, status: "FAILED", message: "No result" });
         continue;
       }
-
-      // -----------------------------------------------
-      // Success
-      // -----------------------------------------------
-
       if (result.success) {
-        sse.broadcast("queue:completed", {
-          request_number: String(request.request_no),
-          type: result.type,
-          status: "COMPLETED",
-          active_status: result.data?.currentStatus || null,
-        });
-
-        // console.log(`COMPLETED: ${request.request_no} | active_status: ${result.data?.currentStatus || "N/A"}`,);
-
-        continue;
+        sse.broadcast("queue:completed", { request_number: String(request.request_no), type: result.type, status: "COMPLETED", active_status: result.data?.currentStatus || null });
+      } else {
+        sse.broadcast("queue:failed", { request_number: String(request.request_no), type: request.request_type, status: "FAILED", message: result.message, active_status: result.data?.currentStatus || null });
       }
-
-      // -----------------------------------------------
-      // Failed
-      // -----------------------------------------------
-
-      sse.broadcast("queue:failed", {
-        request_number: String(request.request_no),
-        type: request.request_type,
-        status: "FAILED",
-        message: result.message,
-        active_status: result.data?.currentStatus || null,
-      });
-
-      console.log(
-        `FAILED: ${request.request_no} - ${result.message || "Unknown error"}`,
-      );
     }
 
-    console.log(`Batch finished: ${requests.length} requests`);
   } catch (error) {
     console.error("processRequestBatch error:", error);
 
     // --------------------------------------------------
-    // Batch-level error
+    // Batch-level error: mark any stuck PROCESSING records
+    // as FAILED so they are not permanently stuck
     // --------------------------------------------------
-
     if (requests.length > 0) {
-      const ids = requests.map((row) => row.id);
+      const failIds = requests.map((row) => row.id);
 
       try {
-        const sql = `
-  UPDATE ver_request_queue
-  SET
-    status = CASE
-      ${statusCase.join("\n")}
-    END,
+        await pool.query(
+          `
+          UPDATE ver_request_queue
+          SET
+            status = 'FAILED',
+            error_message = ?,
+            completed_at = NOW()
+          WHERE id IN (${failIds.map(() => "?").join(",")})
+            AND status = 'PROCESSING'
+          `,
+          [error.message, ...failIds],
+        );
 
-    active_status = CASE
-      ${statusValueCase.join("\n")}
-      ELSE active_status
-    END,
-
-    active_pre_status = CASE
-      ${preStatusCase.join("\n")}
-      ELSE active_pre_status
-    END,
-
-    active_per_status = CASE
-      ${perStatusCase.join("\n")}
-      ELSE active_per_status
-    END,
-
-    completed_at = NOW(),
-
-    error_message = CASE
-      ${errorCase.join("\n")}
-    END
-
-  WHERE ${whereParts.join(" OR ")}
-`;
-
-        const params = [
-          ...statusParams,
-
-          ...statusValueParams,
-
-          ...preStatusParams,
-
-          ...perStatusParams,
-
-          ...errorParams,
-
-          ...whereParams,
-        ];
-
-        await pool.query(sql, params);
-       console.log(mysql.format(sql, params));
-        
-        // --------------------------------------------------
-        // Notify clients
-        // --------------------------------------------------
-
-        for (const req of requests) {
-          sse.broadcast("queue:failed", {
-            request_number: String(req.request_no),
-            type: req.request_type,
-            status: "FAILED",
-            message: error.message,
-          });
-        }
+        console.log(`Marked ${failIds.length} stuck PROCESSING records as FAILED`);
       } catch (updateError) {
-        console.error("Failed to update batch status:", updateError);
+        console.error("Failed to mark batch as FAILED:", updateError);
+      }
+
+      // Notify clients of failure
+      for (const req of requests) {
+        sse.broadcast("queue:failed", {
+          request_number: String(req.request_no),
+          type: req.request_type,
+          status: "FAILED",
+          message: error.message,
+        });
       }
     }
   } finally {
@@ -1051,4 +897,210 @@ function getSepareteStatus(text) {
     presentAddress,
     permanentAddress,
   };
+}
+
+
+
+const VERIFICATION_TABLES = {
+  character: "characters",
+  tenant: "tenants",
+  employee: "employees",
+  domestic: "domestic",
+};
+
+/**
+ * Bulk update destination tables for successfully completed requests.
+ *
+ * IMPORTANT:
+ * Adjust the destination column names below if your actual tables
+ * use different column names.
+ */
+async function updateCompletedVerificationRecords(completedRequests) {
+
+  console.log(" completedRequests ", completedRequests );
+  if (!completedRequests || completedRequests.length === 0) {
+    console.log("No completed requests to update in destination tables.");
+    return [];
+  }
+
+  const updatedRequests = [];
+
+  // --------------------------------------------------
+  // Group completed requests by request type
+  // --------------------------------------------------
+
+  const grouped = {};
+
+  for (const item of completedRequests) {
+    const type = String(item.request_type || "")
+      .trim()
+      .toLowerCase();
+
+    if (!VERIFICATION_TABLES[type]) {
+      console.warn(
+        `Unknown verification type: ${type} | request: ${item.request_no}`,
+      );
+      continue;
+    }
+
+    if (!grouped[type]) {
+      grouped[type] = [];
+    }
+
+    grouped[type].push(item);
+  }
+
+  // --------------------------------------------------
+  // Update each destination table in bulk
+  // --------------------------------------------------
+
+  for (const [type, records] of Object.entries(grouped)) {
+    const tableName = VERIFICATION_TABLES[type];
+
+    if (!records.length) {
+      continue;
+    }
+
+    const currentStatusCase = [];
+    const preStatusCase = [];
+    const perStatusCase = [];
+
+    // Use SEPARATE param arrays for each CASE block so they can be
+    // concatenated in the correct order that matches the SQL structure:
+    //   all currentStatusCase params → all preStatusCase params → all perStatusCase params → WHERE IN params
+    // Mixing them into one flat array interleaved by record caused a bind-
+    // parameter mismatch when processing multiple requests at once.
+    const currentStatusParams = [];
+    const preStatusParams = [];
+    const perStatusParams = [];
+    const requestNumbers = [];
+
+    for (const record of records) {
+      const requestNo = String(record.request_no).trim();
+
+      requestNumbers.push(requestNo);
+
+      const currentStatus =
+        record.result?.data?.currentStatus ??
+        record.data?.currentStatus ??
+        null;
+
+      const preStatus =
+        record.result?.data?.pre_Current_Status ??
+        record.data?.pre_Current_Status ??
+        null;
+
+      const perStatus =
+        record.result?.data?.per_Current_Status ??
+        record.data?.per_Current_Status ??
+        null;
+
+      // -----------------------------------------------
+      // Determine if this request has a terminal status
+      // (APPROVED or REJECTED) from ver_request_queue.
+      //
+      // When terminal, per_Current_Status is only updated
+      // when the row's per_station_code differs from
+      // pre_station_code (cross-station request).
+      // Same-station rows keep their existing per_Current_Status.
+      // -----------------------------------------------
+
+      const isTerminalStatus = preStatus === "APPROVED" || preStatus === "REJECTED";
+
+      // -----------------------------------------------
+      // current status  (always update)
+      // -----------------------------------------------
+
+      currentStatusCase.push(`WHEN request_number = ? THEN ?`);
+      currentStatusParams.push(requestNo, currentStatus);
+
+      // -----------------------------------------------
+      // present address status  (always update)
+      // -----------------------------------------------
+
+      preStatusCase.push(`WHEN request_number = ? THEN ?`);
+      preStatusParams.push(requestNo, preStatus);
+
+      // -----------------------------------------------
+      // permanent address status
+      //
+      // APPROVED / REJECTED  →  only update when the
+      //   row's per_station_code differs from pre_station_code
+      //   (cross-station request). Same-station rows are
+      //   skipped (ELSE per_Current_Status).
+      //
+      // All other statuses   →  always update (existing logic).
+      // -----------------------------------------------
+
+      if (isTerminalStatus) {
+        perStatusCase.push(
+          `WHEN request_number = ? AND per_station_code <> pre_station_code THEN ?`
+        );
+      } else {
+        perStatusCase.push(`WHEN request_number = ? THEN ?`);
+      }
+      perStatusParams.push(requestNo, perStatus);
+    }
+
+    // Assemble final params in the exact order MySQL expects them:
+    // CASE 1 binds, CASE 2 binds, CASE 3 binds, WHERE IN binds.
+    const params = [
+      ...currentStatusParams,
+      ...preStatusParams,
+      ...perStatusParams,
+    ];
+
+    const placeholders = requestNumbers.map(() => "?").join(",");
+
+    const sql = `
+      UPDATE ${tableName}
+      SET
+        Current_Status = CASE
+          ${currentStatusCase.join("\n          ")}
+          ELSE Current_Status
+        END,
+
+        pre_Current_Status = CASE
+          ${preStatusCase.join("\n          ")}
+          ELSE pre_Current_Status
+        END,
+
+        per_Current_Status = CASE
+          ${perStatusCase.join("\n          ")}
+          ELSE per_Current_Status
+        END,
+
+        status_update_time = NOW(),
+
+        updated_at = NOW()
+
+      WHERE request_number IN (${placeholders})
+    `;
+
+    params.push(...requestNumbers);
+
+    console.log(
+      `Updating ${records.length} completed requests in ${tableName}`,
+    );
+
+    const [result] = await pool.query(sql, params);
+
+    console.log(
+      `${tableName}: matched=${result.affectedRows}`,
+    );
+
+    // --------------------------------------------------
+    // Keep only requests that were actually updated
+    // --------------------------------------------------
+
+    for (const record of records) {
+      updatedRequests.push({
+        id: record.id,
+        request_no: record.request_no,
+        request_type: record.request_type,
+      });
+    }
+  }
+
+  return updatedRequests;
 }
